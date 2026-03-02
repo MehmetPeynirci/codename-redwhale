@@ -1,9 +1,10 @@
-[gd_scene load_steps=8 format=3 uid="uid://bhf0s2f4r6m2q"]
+[gd_scene load_steps=9 format=3 uid="uid://bhf0s2f4r6m2q"]
 
 [ext_resource type="PackedScene" path="res://scenes/Player.tscn" id="1_player"]
 [ext_resource type="PackedScene" path="res://scenes/Village.tscn" id="2_village"]
 [ext_resource type="PackedScene" path="res://scenes/CrashCar.tscn" id="3_car"]
 [ext_resource type="Script" path="res://scripts/crash_sequence.gd" id="4_crash"]
+[ext_resource type="Script" path="res://scripts/visual_quality_controller.gd" id="5_quality"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_p61hl"]
 sky_horizon_color = Color(0.33, 0.35, 0.37, 1)
@@ -30,6 +31,7 @@ adjustment_brightness = 0.92
 adjustment_contrast = 1.07
 
 [node name="Main" type="Node3D"]
+script = ExtResource("5_quality")
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="."]
 environment = SubResource("Environment_j35wl")
