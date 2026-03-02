@@ -29,7 +29,12 @@ extends CharacterBody3D
 @export var landing_bump_strength: float = 0.08
 @export var landing_recover_speed: float = 10.0
 
-@export var intro_duration: float = 5.6
+@export var intro_duration: float = 5.8
+@export var intro_prone_height: float = 0.53
+@export var intro_kneel_height: float = 0.76
+@export var intro_breath_amplitude: float = 0.013
+@export var intro_breath_frequency: float = 1.8
+
 @export var injury_duration: float = 15.0
 @export var injury_speed_multiplier: float = 0.72
 
@@ -56,11 +61,13 @@ func _ready() -> void:
 	_setup_default_input_map()
 	add_to_group("player")
 	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+
 	_base_head_pos = head.position
 	_camera_base_pos = camera.position
 	_capsule = collision_shape.shape as CapsuleShape3D
 	if _capsule:
 		stand_capsule_height = _capsule.height
+
 	camera.fov = walk_fov
 	_setup_blink_overlay()
 	_apply_intro_pose(0.0)
@@ -86,7 +93,7 @@ func _unhandled_input(event: InputEvent) -> void:
 func _physics_process(delta: float) -> void:
 	_elapsed_time += delta
 	if _intro_active:
-		_update_intro(delta)
+		_update_intro(_elapsed_time)
 		return
 
 	_injury_elapsed += delta
@@ -97,7 +104,8 @@ func _physics_process(delta: float) -> void:
 	_update_crouch_state(delta)
 
 	var input_dir: Vector2 = Input.get_vector("move_left", "move_right", "move_forward", "move_back")
-	var wish_dir: Vector3 = (global_transform.basis * Vector3(input_dir.x, 0.0, input_dir.y)).normalized()
+	var yaw_basis: Basis = Basis(Vector3.UP, rotation.y)
+	var wish_dir: Vector3 = (yaw_basis * Vector3(input_dir.x, 0.0, input_dir.y)).normalized()
 
 	var speed: float = walk_speed
 	if _is_crouching:
@@ -106,11 +114,11 @@ func _physics_process(delta: float) -> void:
 		speed = sprint_speed
 
 	if _is_injured_phase():
-		var limp_pulse: float = maxf(0.0, sin(_injury_elapsed * 8.5))
-		var limp_factor: float = injury_speed_multiplier * (0.9 - limp_pulse * 0.22)
+		var limp_pulse: float = maxf(0.0, sin(_injury_elapsed * 8.0))
+		var limp_factor: float = injury_speed_multiplier * (0.92 - limp_pulse * 0.22)
 		speed *= limp_factor
 		if Input.is_action_pressed("move_sprint"):
-			speed = maxf(speed * 0.95, walk_speed * 0.95)
+			speed = maxf(speed, walk_speed * 0.95)
 
 	var target_velocity: Vector3 = wish_dir * speed
 	var control: float = 1.0 if is_on_floor() else air_control
@@ -132,57 +140,80 @@ func _physics_process(delta: float) -> void:
 	_apply_headbob(delta)
 	_update_camera_effects(delta, input_dir)
 
-func _update_intro(delta: float) -> void:
+func _update_intro(t: float) -> void:
 	velocity = Vector3.ZERO
-	_apply_intro_pose(_elapsed_time)
-	_update_blink_overlay(_elapsed_time)
+	_apply_intro_pose(t)
+	_update_blink_overlay(t)
 
-	if _elapsed_time >= intro_duration:
-		_intro_active = false
-		_injury_elapsed = 0.0
-		if is_instance_valid(_blink_overlay):
-			_blink_overlay.visible = false
-		head.position = _base_head_pos
-		head.rotation.z = 0.0
-		camera.position = _camera_base_pos
+	if t >= intro_duration:
+		_finish_intro()
+
+func _finish_intro() -> void:
+	_intro_active = false
+	_injury_elapsed = 0.0
+	_pitch = 0.0
+	_mouse_sway = Vector2.ZERO
+	_landing_offset = 0.0
+
+	rotation.x = 0.0
+	rotation.z = 0.0
+	_base_head_pos.y = stand_head_height
+	head.position = _base_head_pos
+	head.rotation = Vector3.ZERO
+	camera.position = _camera_base_pos
+	camera.rotation = Vector3.ZERO
+
+	if is_instance_valid(_blink_overlay):
+		_blink_overlay.visible = false
 
 func _apply_intro_pose(t: float) -> void:
-	var prone_end: float = 1.8
-	var stand_start: float = 2.7
-	var stand_end: float = intro_duration
+	var hold_end: float = intro_duration * 0.34
+	var recover_end: float = intro_duration * 0.52
+	var prone_pitch: float = deg_to_rad(-86.0)
+	var recover_pitch: float = deg_to_rad(-68.0)
+	var prone_roll: float = deg_to_rad(10.0)
+	var recover_roll: float = deg_to_rad(4.0)
 
-	if t <= prone_end:
-		_base_head_pos.y = 0.55
+	if t <= hold_end:
+		var breathe: float = sin(t * intro_breath_frequency * TAU) * intro_breath_amplitude
+		_base_head_pos.y = intro_prone_height + breathe
 		head.position = Vector3(_base_head_pos.x, _base_head_pos.y, _base_head_pos.z)
-		head.rotation.x = deg_to_rad(-84.0)
-		head.rotation.z = deg_to_rad(8.0)
-		camera.position = _camera_base_pos + Vector3(0.04, -0.02, 0.0)
+		_pitch = prone_pitch
+		head.rotation.x = _pitch
+		head.rotation.z = prone_roll
+		camera.position = _camera_base_pos + Vector3(0.04, -0.04, 0.03)
 		return
 
-	if t < stand_start:
-		_base_head_pos.y = lerpf(0.55, 0.68, (t - prone_end) / (stand_start - prone_end))
+	if t <= recover_end:
+		var recover_alpha: float = _ease_in_out((t - hold_end) / maxf(0.01, recover_end - hold_end))
+		_base_head_pos.y = lerpf(intro_prone_height, intro_kneel_height, recover_alpha)
 		head.position = Vector3(_base_head_pos.x, _base_head_pos.y, _base_head_pos.z)
-		head.rotation.x = deg_to_rad(-84.0)
-		head.rotation.z = deg_to_rad(6.0)
-		camera.position = _camera_base_pos + Vector3(0.03, -0.01, 0.0)
+		_pitch = lerpf(prone_pitch, recover_pitch, recover_alpha)
+		head.rotation.x = _pitch
+		head.rotation.z = lerpf(prone_roll, recover_roll, recover_alpha)
+		var cam_from: Vector3 = _camera_base_pos + Vector3(0.04, -0.04, 0.03)
+		var cam_to: Vector3 = _camera_base_pos + Vector3(0.02, -0.01, 0.0)
+		camera.position = cam_from.lerp(cam_to, recover_alpha)
 		return
 
-	var stand_t: float = clampf((t - stand_start) / maxf(0.01, stand_end - stand_start), 0.0, 1.0)
-	_base_head_pos.y = lerpf(0.68, stand_head_height, stand_t)
+	var stand_alpha: float = _ease_in_out((t - recover_end) / maxf(0.01, intro_duration - recover_end))
+	_base_head_pos.y = lerpf(intro_kneel_height, stand_head_height, stand_alpha)
 	head.position = Vector3(_base_head_pos.x, _base_head_pos.y, _base_head_pos.z)
-	_pitch = lerpf(deg_to_rad(-84.0), 0.0, stand_t)
+	_pitch = lerpf(recover_pitch, 0.0, stand_alpha)
 	head.rotation.x = _pitch
-	head.rotation.z = lerpf(deg_to_rad(6.0), 0.0, stand_t)
-	var intro_cam_offset: Vector3 = Vector3(0.03, -0.01, 0.0)
-	camera.position = (_camera_base_pos + intro_cam_offset).lerp(_camera_base_pos, stand_t)
+	head.rotation.z = lerpf(recover_roll, 0.0, stand_alpha)
+	camera.position = (_camera_base_pos + Vector3(0.02, -0.01, 0.0)).lerp(_camera_base_pos, stand_alpha)
 
 func _update_blink_overlay(t: float) -> void:
 	if not is_instance_valid(_blink_overlay):
 		return
 	_blink_overlay.visible = true
+
+	var hold_end: float = intro_duration * 0.34
 	var alpha: float = 0.0
-	alpha = maxf(alpha, _blink_curve(t, 1.95, 0.22))
-	alpha = maxf(alpha, _blink_curve(t, 2.35, 0.22))
+	alpha = maxf(alpha, _blink_curve(t, hold_end + 0.12, 0.22))
+	alpha = maxf(alpha, _blink_curve(t, hold_end + 0.48, 0.2))
+
 	_blink_overlay.color = Color(0.0, 0.0, 0.0, alpha)
 
 func _blink_curve(t: float, center: float, duration: float) -> float:
@@ -191,6 +222,10 @@ func _blink_curve(t: float, center: float, duration: float) -> float:
 	if d >= half:
 		return 0.0
 	return 1.0 - (d / half)
+
+func _ease_in_out(x: float) -> float:
+	var t: float = clampf(x, 0.0, 1.0)
+	return t * t * (3.0 - 2.0 * t)
 
 func _setup_blink_overlay() -> void:
 	var layer: CanvasLayer = CanvasLayer.new()
@@ -236,12 +271,14 @@ func _apply_headbob(delta: float) -> void:
 		var bob_mul: float = sprint_headbob_multiplier if Input.is_action_pressed("move_sprint") and not _is_crouching else 1.0
 		var limp_mul: float = 1.2 if _is_injured_phase() else 1.0
 		_bob_time += delta * horizontal_speed * headbob_frequency * bob_mul * limp_mul
+
 		var crouch_mul: float = 0.55 if _is_crouching else 1.0
 		var limp_side: float = sin(_injury_elapsed * 7.0) * (0.03 if _is_injured_phase() else 0.0)
 		var bob_x: float = cos(_bob_time * 0.5) * headbob_amplitude * 0.45 * crouch_mul + limp_side
 		var bob_y: float = sin(_bob_time) * headbob_amplitude * crouch_mul
 		if _is_injured_phase():
 			bob_y = maxf(0.0, bob_y) * 1.3 - headbob_amplitude * 0.24
+
 		head.position = _base_head_pos + Vector3(bob_x, bob_y - _landing_offset, 0.0)
 	else:
 		_bob_time = lerpf(_bob_time, 0.0, 8.0 * delta)
@@ -261,7 +298,9 @@ func _update_camera_effects(delta: float, input_dir: Vector2) -> void:
 	var limp_roll: float = sin(_injury_elapsed * 7.0) * 0.035 if _is_injured_phase() else 0.0
 	var target_roll: float = -input_dir.x * camera_tilt_strength + _mouse_sway.x + limp_roll
 	camera.rotation.z = lerpf(camera.rotation.z, target_roll, minf(1.0, 10.0 * delta))
-	camera.position = camera.position.lerp(_camera_base_pos + Vector3(_mouse_sway.x * 0.35, -_mouse_sway.y * 0.35, 0.0), minf(1.0, 10.0 * delta))
+
+	var sway_offset: Vector3 = Vector3(_mouse_sway.x * 0.35, -_mouse_sway.y * 0.35, 0.0)
+	camera.position = camera.position.lerp(_camera_base_pos + sway_offset, minf(1.0, 10.0 * delta))
 
 func _setup_default_input_map() -> void:
 	_add_action_if_missing("move_forward", KEY_W)
@@ -273,7 +312,7 @@ func _setup_default_input_map() -> void:
 	_add_action_if_missing("move_crouch", KEY_CTRL)
 	_add_action_if_missing("click_capture", MOUSE_BUTTON_LEFT, true)
 
-func _add_action_if_missing(action: StringName, keycode: int, is_mouse := false) -> void:
+func _add_action_if_missing(action: StringName, keycode: int, is_mouse: bool = false) -> void:
 	if not InputMap.has_action(action):
 		InputMap.add_action(action)
 	if InputMap.action_get_events(action).is_empty():
