@@ -84,3 +84,6 @@ position = Vector3(0.48, 0.95, 0.38)
 [node name="ExitMarker" type="Marker3D" parent="."]
 position = Vector3(1.8, 0.05, 0.45)
 rotation = Vector3(0, -1.6, 0)
+
+[node name="RefuelPoint" type="Marker3D" parent="."]
+position = Vector3(0.65, 0.55, 2.0)

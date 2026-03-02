@@ -50,6 +50,7 @@ var _mouse_sway: Vector2 = Vector2.ZERO
 var _controls_locked: bool = false
 var _injury_time_left: float = 0.0
 var _injury_wobble_time: float = 0.0
+var _has_fuel: bool = false
 
 func _ready() -> void:
 	_setup_default_input_map()
@@ -154,6 +155,15 @@ func start_injury(duration_seconds: float = -1.0) -> void:
 	_injury_time_left = maxf(0.0, duration)
 	_injury_wobble_time = 0.0
 
+func set_has_fuel(value: bool) -> void:
+	_has_fuel = value
+
+func has_fuel() -> bool:
+	return _has_fuel
+
+func consume_fuel() -> void:
+	_has_fuel = false
+
 func place_player(world_transform: Transform3D) -> void:
 	global_transform = world_transform
 	velocity = Vector3.ZERO
@@ -249,6 +259,7 @@ func _setup_default_input_map() -> void:
 	_add_action_if_missing("move_jump", KEY_SPACE)
 	_add_action_if_missing("move_sprint", KEY_SHIFT)
 	_add_action_if_missing("move_crouch", KEY_CTRL)
+	_add_action_if_missing("interact", KEY_E)
 	_add_action_if_missing("click_capture", MOUSE_BUTTON_LEFT, true)
 
 func _add_action_if_missing(action: StringName, keycode: int, is_mouse: bool = false) -> void:
