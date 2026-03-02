@@ -1,6 +1,6 @@
 extends Node3D
 
-@export var grave_count: int = 48
+@export var grave_count: int = 34
 @export var village_radius: float = 90.0
 @export var tree_count: int = 78
 @export var grass_count: int = 2200
@@ -212,7 +212,7 @@ func _create_graves() -> void:
 	mm.mesh = grave_mesh
 
 	for i in range(grave_count):
-		var local_pos: Vector3 = Vector3(randf_range(-8.0, 8.0), 0.52, randf_range(-12.0, 12.0))
+		var local_pos: Vector3 = Vector3(randf_range(-6.5, 6.5), 0.52, randf_range(-9.5, 9.5))
 		var basis: Basis = Basis.from_euler(Vector3(0.0, randf_range(-0.35, 0.35), randf_range(-0.05, 0.08)))
 		var xform: Transform3D = Transform3D(basis, local_pos)
 		xform = xform.scaled_local(Vector3(randf_range(0.9, 1.2), randf_range(0.75, 1.35), 1.0))
