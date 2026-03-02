@@ -213,6 +213,9 @@ func lock_controls(locked: bool) -> void:
 		_mouse_sway = Vector2.ZERO
 		_bob_time = 0.0
 
+func controls_locked() -> bool:
+	return _controls_locked
+
 func start_injury(duration_seconds: float = -1.0) -> void:
 	var duration: float = injury_default_duration if duration_seconds <= 0.0 else duration_seconds
 	_injury_time_left = maxf(0.0, duration)
@@ -417,6 +420,10 @@ func _update_door_prompt() -> void:
 		return
 	if _nearby_door == null:
 		_door_prompt_bg.visible = false
+		return
+	if _nearby_door.has_method("get_prompt_text"):
+		_door_prompt_label.text = str(_nearby_door.call("get_prompt_text"))
+		_door_prompt_bg.visible = true
 		return
 	if not _nearby_door.has_method("is_open"):
 		_door_prompt_bg.visible = false

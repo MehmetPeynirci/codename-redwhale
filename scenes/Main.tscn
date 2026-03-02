@@ -1,4 +1,4 @@
-[gd_scene load_steps=10 format=3 uid="uid://bhf0s2f4r6m2q"]
+[gd_scene load_steps=13 format=3 uid="uid://bhf0s2f4r6m2q"]
 
 [ext_resource type="PackedScene" path="res://scenes/Player.tscn" id="1_player"]
 [ext_resource type="PackedScene" path="res://scenes/Village.tscn" id="2_village"]
@@ -6,30 +6,30 @@
 [ext_resource type="Script" path="res://scripts/crash_sequence.gd" id="4_crash"]
 [ext_resource type="Script" path="res://scripts/visual_quality_controller.gd" id="5_quality"]
 [ext_resource type="PackedScene" path="res://scenes/FuelCan.tscn" id="6_fuel"]
+[ext_resource type="Shader" path="res://shaders/night_sky.gdshader" id="7_night_sky"]
+[ext_resource type="Script" path="res://scripts/minimap_ui.gd" id="8_minimap"]
+[ext_resource type="Script" path="res://scripts/horror_director.gd" id="9_horror"]
 
-[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_p61hl"]
-sky_horizon_color = Color(0.33, 0.35, 0.37, 1)
-sky_top_color = Color(0.13, 0.15, 0.17, 1)
-ground_horizon_color = Color(0.06, 0.06, 0.06, 1)
-ground_bottom_color = Color(0.03, 0.03, 0.03, 1)
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_night_sky"]
+shader = ExtResource("7_night_sky")
 
 [sub_resource type="Sky" id="Sky_4hgrx"]
-sky_material = SubResource("ProceduralSkyMaterial_p61hl")
+sky_material = SubResource("ShaderMaterial_night_sky")
 
 [sub_resource type="Environment" id="Environment_j35wl"]
 background_mode = 2
 sky = SubResource("Sky_4hgrx")
 ambient_light_source = 3
-ambient_light_color = Color(0.38, 0.4, 0.42, 1)
-ambient_light_energy = 0.8
+ambient_light_color = Color(0.2, 0.25, 0.34, 1)
+ambient_light_energy = 0.35
 fog_enabled = true
-fog_light_energy = 0.65
-fog_density = 0.018
+fog_light_energy = 0.32
+fog_density = 0.012
 volumetric_fog_enabled = true
-volumetric_fog_density = 0.03
+volumetric_fog_density = 0.018
 adjustment_enabled = true
-adjustment_brightness = 0.92
-adjustment_contrast = 1.07
+adjustment_brightness = 0.86
+adjustment_contrast = 1.03
 
 [node name="Main" type="Node3D"]
 script = ExtResource("5_quality")
@@ -56,9 +56,21 @@ seat_marker_path = NodePath("../CrashCar/SeatMarker")
 exit_marker_path = NodePath("../CrashCar/ExitMarker")
 refuel_point_path = NodePath("../CrashCar/RefuelPoint")
 
+[node name="HorrorDirector" type="Node" parent="."]
+script = ExtResource("9_horror")
+player_path = NodePath("../Player")
+car_path = NodePath("../CrashCar")
+village_path = NodePath("../Village")
+crash_sequence_path = NodePath("../CrashSequence")
+
+[node name="MinimapUI" type="Node" parent="."]
+script = ExtResource("8_minimap")
+player_path = NodePath("../Player")
+village_path = NodePath("../Village")
+
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
 transform = Transform3D(0.965926, -0.258819, 0, 0.183013, 0.683013, -0.707107, 0.183013, 0.683013, 0.707107, 0, 9, 0)
-light_energy = 0.78
-light_color = Color(0.74, 0.76, 0.79, 1)
+light_energy = 0.26
+light_color = Color(0.54, 0.59, 0.76, 1)
 shadow_enabled = true
 shadow_blur = 1.6

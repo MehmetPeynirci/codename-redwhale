@@ -28,6 +28,9 @@ enum SequenceState {
 @export var third_person_fov: float = 78.0
 @export var camera_shake_drive: float = 0.06
 @export var camera_shake_stall: float = 0.12
+@export var enable_refuel_objective: bool = false
+@export var hood_steam_local_pos: Vector3 = Vector3(0.0, 1.05, -1.95)
+@export var steam_start_delay: float = 0.24
 
 var _player: CharacterBody3D
 var _car: Node3D
@@ -51,6 +54,11 @@ var _ui_layer: CanvasLayer
 var _objective_bg: ColorRect
 var _objective_label: Label
 var _return_hint_shown: bool = false
+var _engine_bg: ColorRect
+var _engine_label: Label
+var _engine_bar_bg: ColorRect
+var _engine_bar_fill: ColorRect
+var _steam_fx: GPUParticles3D
 
 func _ready() -> void:
 	_player = get_node_or_null(player_path) as CharacterBody3D
@@ -66,6 +74,8 @@ func _ready() -> void:
 
 	_create_objective_ui()
 	_set_objective("")
+	_create_engine_ui()
+	_create_steam_fx()
 
 	_car_start = _car.global_transform
 	_car_drive_end = _car_start.translated_local(Vector3(0.0, 0.0, -drive_distance))
@@ -101,6 +111,7 @@ func _update_drive(delta: float) -> void:
 	var alpha: float = clampf(_state_time / maxf(0.01, drive_duration), 0.0, 1.0)
 	var eased: float = _ease_in_out(alpha)
 	_car.global_transform = _car_start.interpolate_with(_car_drive_end, eased)
+	_set_engine_status(lerpf(0.42, 0.9, alpha), alpha >= 0.82)
 
 	var road_vibration: float = sin(_state_time * 13.0) * 0.01
 	var pitch: float = deg_to_rad(-4.0 + road_vibration * 28.0)
@@ -117,6 +128,8 @@ func _update_stall(delta: float) -> void:
 	var t: float = clampf(_state_time / maxf(0.01, stall_duration), 0.0, 1.0)
 	var eased: float = 1.0 - pow(1.0 - t, 3.0)
 	_car.global_transform = _car_drive_end.interpolate_with(_car_stop_end, eased)
+	_set_engine_status(1.0, true)
+	_set_steam_emitting(_state_time >= steam_start_delay)
 
 	var sputter: float = sin(_state_time * 22.0) * (1.0 - t)
 	var pitch: float = deg_to_rad(-8.0 + sputter * 2.4)
@@ -131,6 +144,8 @@ func _update_stall(delta: float) -> void:
 
 func _update_settle(delta: float) -> void:
 	_car.global_transform = _car_stop_end
+	_set_engine_status(1.0, true)
+	_set_steam_emitting(true)
 	var alpha: float = clampf(_state_time / maxf(0.01, settle_duration), 0.0, 1.0)
 	var eased: float = _ease_in_out(alpha)
 
@@ -146,6 +161,9 @@ func _update_settle(delta: float) -> void:
 func _finish_cinematic() -> void:
 	_car.global_transform = _car_stop_end
 	_disable_intro_camera()
+	_set_steam_emitting(false)
+	if _engine_bg != null:
+		_engine_bg.visible = false
 	_player.call("place_player", _exit_marker.global_transform)
 	_player.call("reset_head_camera_pose")
 	_set_first_person_camera_active(true)
@@ -153,11 +171,16 @@ func _finish_cinematic() -> void:
 	if _player.has_method("unlock_night_vision_controls"):
 		_player.call("unlock_night_vision_controls", true)
 
-	_set_objective("Motor bozuldu. Koyde bir yerden yakit bidonu bul.")
+	if enable_refuel_objective:
+		_set_objective("Motor bozuldu. Koyde bir yerden yakit bidonu bul.")
+	else:
+		_set_objective("")
 	_state = SequenceState.GAMEPLAY
 	_state_time = 0.0
 
 func _update_gameplay() -> void:
+	if not enable_refuel_objective:
+		return
 	var has_fuel: bool = bool(_player.call("has_fuel"))
 	if has_fuel and not _return_hint_shown:
 		_return_hint_shown = true
@@ -194,9 +217,104 @@ func _update_restart(delta: float) -> void:
 		_player.call("lock_controls", false)
 		if _player.has_method("unlock_night_vision_controls"):
 			_player.call("unlock_night_vision_controls", true)
-		_set_objective("Motor calisti. Hazirsan yola devam et.")
-		_state = SequenceState.GAMEPLAY
-		_state_time = 0.0
+			_set_objective("Motor calisti. Hazirsan yola devam et.")
+			_state = SequenceState.GAMEPLAY
+			_state_time = 0.0
+
+func _create_engine_ui() -> void:
+	_engine_bg = ColorRect.new()
+	_engine_bg.position = Vector2(24.0, 24.0)
+	_engine_bg.size = Vector2(360.0, 86.0)
+	_engine_bg.color = Color(0.03, 0.03, 0.04, 0.74)
+	_engine_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_ui_layer.add_child(_engine_bg)
+
+	_engine_label = Label.new()
+	_engine_label.position = Vector2(12.0, 10.0)
+	_engine_label.size = Vector2(330.0, 24.0)
+	_engine_label.add_theme_color_override("font_color", Color(0.93, 0.95, 0.96, 1.0))
+	_engine_label.add_theme_font_size_override("font_size", 17)
+	_engine_bg.add_child(_engine_label)
+
+	_engine_bar_bg = ColorRect.new()
+	_engine_bar_bg.position = Vector2(12.0, 43.0)
+	_engine_bar_bg.size = Vector2(334.0, 20.0)
+	_engine_bar_bg.color = Color(0.08, 0.09, 0.1, 0.95)
+	_engine_bg.add_child(_engine_bar_bg)
+
+	_engine_bar_fill = ColorRect.new()
+	_engine_bar_fill.position = Vector2(0.0, 0.0)
+	_engine_bar_fill.size = Vector2(8.0, 20.0)
+	_engine_bar_fill.color = Color(0.84, 0.33, 0.2, 1.0)
+	_engine_bar_bg.add_child(_engine_bar_fill)
+
+	_set_engine_status(0.42, false)
+
+func _set_engine_status(value: float, critical: bool) -> void:
+	var clamped: float = clampf(value, 0.0, 1.0)
+	if _engine_bar_fill != null and _engine_bar_bg != null:
+		_engine_bar_fill.size.x = _engine_bar_bg.size.x * clamped
+		var cool: Color = Color(0.85, 0.66, 0.14, 1.0)
+		var hot: Color = Color(0.89, 0.15, 0.13, 1.0)
+		_engine_bar_fill.color = cool.lerp(hot, pow(clamped, 1.45))
+	if _engine_label != null:
+		_engine_label.text = "Hararet: %d%% %s" % [int(clamped * 100.0), "[KRITIK]" if critical else ""]
+
+func _create_steam_fx() -> void:
+	if _car == null:
+		return
+	_steam_fx = GPUParticles3D.new()
+	_steam_fx.name = "HoodSteamFX"
+	_steam_fx.position = hood_steam_local_pos
+	_steam_fx.amount = 32
+	_steam_fx.lifetime = 1.4
+	_steam_fx.preprocess = 0.6
+	_steam_fx.one_shot = false
+	_steam_fx.explosiveness = 0.2
+	_steam_fx.randomness = 0.55
+	_steam_fx.draw_pass_1 = _create_steam_quad()
+	var pm: ParticleProcessMaterial = ParticleProcessMaterial.new()
+	pm.direction = Vector3(0.0, 1.0, 0.0)
+	pm.spread = 21.0
+	pm.initial_velocity_min = 1.0
+	pm.initial_velocity_max = 1.8
+	pm.gravity = Vector3(0.0, 0.35, 0.0)
+	pm.scale_min = 0.7
+	pm.scale_max = 1.2
+	pm.scale_curve = _create_steam_scale_curve()
+	pm.color = Color(0.85, 0.86, 0.88, 0.42)
+	pm.color_ramp = _create_steam_ramp()
+	_steam_fx.process_material = pm
+	_steam_fx.emitting = false
+	_car.add_child(_steam_fx)
+
+func _create_steam_quad() -> QuadMesh:
+	var quad: QuadMesh = QuadMesh.new()
+	quad.size = Vector2(0.26, 0.26)
+	return quad
+
+func _create_steam_scale_curve() -> CurveTexture:
+	var curve: Curve = Curve.new()
+	curve.add_point(Vector2(0.0, 0.2))
+	curve.add_point(Vector2(0.35, 0.75))
+	curve.add_point(Vector2(1.0, 0.1))
+	var texture: CurveTexture = CurveTexture.new()
+	texture.curve = curve
+	return texture
+
+func _create_steam_ramp() -> GradientTexture1D:
+	var gradient: Gradient = Gradient.new()
+	gradient.add_point(0.0, Color(0.9, 0.9, 0.92, 0.0))
+	gradient.add_point(0.2, Color(0.92, 0.92, 0.93, 0.55))
+	gradient.add_point(0.65, Color(0.8, 0.82, 0.84, 0.28))
+	gradient.add_point(1.0, Color(0.76, 0.78, 0.8, 0.0))
+	var ramp: GradientTexture1D = GradientTexture1D.new()
+	ramp.gradient = gradient
+	return ramp
+
+func _set_steam_emitting(enabled: bool) -> void:
+	if _steam_fx != null:
+		_steam_fx.emitting = enabled
 
 func _snap_player_to_seat(pitch: float, roll: float, camera_offset: Vector3) -> void:
 	_player.call("place_player", _seat_marker.global_transform)

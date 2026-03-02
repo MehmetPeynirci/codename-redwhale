@@ -7,6 +7,10 @@ class_name InteractableDoor
 @export var open_direction: float = -1.0
 @export var require_facing_door: bool = true
 @export var facing_dot_threshold: float = 0.05
+@export var starts_locked: bool = false
+@export var locked_prompt: String = "Kilitli. Mezar sembollerini cozmeyi dene."
+@export var open_prompt: String = "Kapiyi acmak icin P'ye basin"
+@export var close_prompt: String = "Kapiyi kapatmak icin P'ye basin"
 @export var handle_path: NodePath = NodePath("DoorBody/HandlePivot")
 @export var handle_press_angle_deg: float = 24.0
 @export var handle_press_duration: float = 0.08
@@ -25,12 +29,14 @@ var _handle_pivot: Node3D
 var _handle_rest_rotation: Vector3 = Vector3.ZERO
 var _squeak_player: AudioStreamPlayer3D
 var _door_collision_shape: CollisionShape3D
+var _locked: bool = false
 
 func _ready() -> void:
 	_ensure_input_action()
 	add_to_group("interactable_door")
 	_closed_y = rotation.y
 	_open_y = _closed_y + deg_to_rad(open_angle_deg) * open_direction
+	_locked = starts_locked
 	_player = _find_player()
 	_cache_nodes()
 	if _handle_pivot != null:
@@ -86,6 +92,10 @@ func _is_nearest_door() -> bool:
 	return nearest == self
 
 func _toggle() -> void:
+	if _locked:
+		_play_squeak()
+		return
+
 	_cache_nodes()
 	if not _is_open:
 		_set_door_collision_enabled(false)
@@ -190,6 +200,19 @@ func _set_door_collision_enabled(enabled: bool) -> void:
 
 func is_open() -> bool:
 	return _is_open
+
+func is_locked() -> bool:
+	return _locked
+
+func set_locked(value: bool) -> void:
+	_locked = value
+
+func get_prompt_text() -> String:
+	if _locked:
+		return locked_prompt
+	if _is_open:
+		return close_prompt
+	return open_prompt
 
 func can_player_interact(player_node: Node3D) -> bool:
 	if player_node == null:

@@ -33,6 +33,8 @@ size = Vector3(1.95, 1.15, 4.6)
 
 [node name="CrashCar" type="Node3D"]
 script = ExtResource("1_adapter")
+y_rotation_offset_deg = 180.0
+model_ground_offset = -0.12
 
 [node name="CarBody" type="StaticBody3D" parent="."]
 
@@ -93,3 +95,45 @@ rotation = Vector3(0, -1.6, 0)
 
 [node name="RefuelPoint" type="Marker3D" parent="."]
 position = Vector3(0.72, 0.6, 1.92)
+
+[node name="Headlights" type="Node3D" parent="."]
+
+[node name="HeadlightLeft" type="SpotLight3D" parent="Headlights"]
+position = Vector3(-0.72, 0.74, -2.02)
+rotation = Vector3(-0.03, 0, 0)
+light_color = Color(1, 0.97, 0.92, 1)
+light_energy = 7.1
+light_specular = 0.45
+shadow_enabled = true
+shadow_bias = 0.05
+shadow_normal_bias = 1.1
+spot_range = 27.0
+spot_attenuation = 1.06
+spot_angle = 37.0
+
+[node name="HeadlightRight" type="SpotLight3D" parent="Headlights"]
+position = Vector3(0.72, 0.74, -2.02)
+rotation = Vector3(-0.03, 0, 0)
+light_color = Color(1, 0.97, 0.92, 1)
+light_energy = 7.1
+light_specular = 0.45
+shadow_enabled = true
+shadow_bias = 0.05
+shadow_normal_bias = 1.1
+spot_range = 27.0
+spot_attenuation = 1.06
+spot_angle = 37.0
+
+[node name="HeadlightGlowLeft" type="OmniLight3D" parent="Headlights"]
+position = Vector3(-0.72, 0.74, -1.93)
+light_color = Color(1, 0.96, 0.9, 1)
+light_energy = 0.82
+omni_range = 2.5
+omni_attenuation = 1.8
+
+[node name="HeadlightGlowRight" type="OmniLight3D" parent="Headlights"]
+position = Vector3(0.72, 0.74, -1.93)
+light_color = Color(1, 0.96, 0.9, 1)
+light_energy = 0.82
+omni_range = 2.5
+omni_attenuation = 1.8

@@ -61,6 +61,8 @@ var _house_positions: Array[Vector3] = [
 	Vector3(-30.0, 0.0, 2.0)
 ]
 var _house_rotations: Array[float] = [-0.3, 0.45, 1.1, -1.4, 0.7, -0.9]
+var _house_nodes: Dictionary = {}
+var _house_doors: Dictionary = {}
 
 func _ready() -> void:
 	randomize()
@@ -72,6 +74,7 @@ func _ready() -> void:
 	_create_tree_clusters()
 	_create_foliage()
 	_create_rocks()
+	_create_story_landmarks()
 
 func _configure_terrain_noise() -> void:
 	_terrain_noise_primary = FastNoiseLite.new()
@@ -361,26 +364,33 @@ func _create_ruined_houses() -> void:
 	for i in range(_house_positions.size()):
 		var house_pos: Vector3 = _house_positions[i]
 		house_pos.y = _sample_terrain_height(house_pos.x, house_pos.z)
-		_create_ruined_house(house_pos, _house_rotations[i])
+		var house: Node3D = _create_ruined_house(i, house_pos, _house_rotations[i])
+		_house_nodes[i] = house
 
-func _create_ruined_house(origin: Vector3, y_rot: float) -> void:
+func _create_ruined_house(index: int, origin: Vector3, y_rot: float) -> Node3D:
 	var house: Node3D = Node3D.new()
 	house.position = origin
 	house.rotation.y = y_rot
+	house.name = "House_%d" % index
+	house.add_to_group("story_house")
 	add_child(house)
 
-	_add_box_segment(house, Vector3(6.0, 0.04, 6.0), Vector3(0.0, 0.02, 0.0), Vector3.ZERO, _wall_mat, false)
+	var wall_material: Material = _wall_mat
+	if index == 1:
+		wall_material = _grave_mat
+
+	_add_box_segment(house, Vector3(6.0, 0.04, 6.0), Vector3(0.0, 0.02, 0.0), Vector3.ZERO, wall_material, false)
 
 	var h: float = 2.8
 	var t: float = 0.22
 
-	_add_box_segment(house, Vector3(6.0, h, t), Vector3(0.0, h * 0.5, -3.0), Vector3.ZERO, _wall_mat, true)
-	_add_box_segment(house, Vector3(t, h, 6.0), Vector3(-3.0, h * 0.5, 0.0), Vector3.ZERO, _wall_mat, true)
-	_add_box_segment(house, Vector3(t, h, 6.0), Vector3(3.0, h * 0.5, 0.0), Vector3.ZERO, _wall_mat, true)
+	_add_box_segment(house, Vector3(6.0, h, t), Vector3(0.0, h * 0.5, -3.0), Vector3.ZERO, wall_material, true)
+	_add_box_segment(house, Vector3(t, h, 6.0), Vector3(-3.0, h * 0.5, 0.0), Vector3.ZERO, wall_material, true)
+	_add_box_segment(house, Vector3(t, h, 6.0), Vector3(3.0, h * 0.5, 0.0), Vector3.ZERO, wall_material, true)
 
-	_add_box_segment(house, Vector3(2.1, h, t), Vector3(-1.95, h * 0.5, 3.0), Vector3.ZERO, _wall_mat, true)
-	_add_box_segment(house, Vector3(2.1, h, t), Vector3(1.95, h * 0.5, 3.0), Vector3.ZERO, _wall_mat, true)
-	_add_box_segment(house, Vector3(1.8, 0.4, t), Vector3(0.0, 2.6, 3.0), Vector3.ZERO, _wall_mat, true)
+	_add_box_segment(house, Vector3(2.1, h, t), Vector3(-1.95, h * 0.5, 3.0), Vector3.ZERO, wall_material, true)
+	_add_box_segment(house, Vector3(2.1, h, t), Vector3(1.95, h * 0.5, 3.0), Vector3.ZERO, wall_material, true)
+	_add_box_segment(house, Vector3(1.8, 0.4, t), Vector3(0.0, 2.6, 3.0), Vector3.ZERO, wall_material, true)
 
 	_add_box_segment(house, Vector3(4.8, 0.15, 2.1), Vector3(-0.8, 2.9, -1.1), Vector3(0.16, 0.25, -0.1), _roof_mat, true)
 	_add_box_segment(house, Vector3(2.5, 0.15, 1.5), Vector3(1.5, 2.5, 1.0), Vector3(-0.1, -0.2, 0.1), _roof_mat, true)
@@ -390,9 +400,18 @@ func _create_ruined_house(origin: Vector3, y_rot: float) -> void:
 	_add_box_segment(house, Vector3(0.12, 2.2, 0.12), Vector3(-0.84, 1.3, 2.94), Vector3.ZERO, _wood_mat, false)
 	_add_box_segment(house, Vector3(0.12, 2.2, 0.12), Vector3(0.84, 1.3, 2.94), Vector3.ZERO, _wood_mat, false)
 
-	_add_house_door(house)
+	var door_hinge: Node3D = _add_house_door(house)
+	_house_doors[index] = door_hinge
+	if index == 1 and door_hinge != null:
+		door_hinge.add_to_group("story_locked_door")
+		if door_hinge.has_method("set_locked"):
+			door_hinge.call("set_locked", true)
+	if index == 2:
+		_add_box_segment(house, Vector3(1.8, 0.12, 1.4), Vector3(1.15, 1.96, -0.85), Vector3(0.55, -0.12, 0.18), _roof_mat, false)
 
-func _add_house_door(house: Node3D) -> void:
+	return house
+
+func _add_house_door(house: Node3D) -> Node3D:
 	var hinge: Node3D = Node3D.new()
 	hinge.name = "DoorHinge"
 	hinge.position = Vector3(-0.76, 0.02, 2.89)
@@ -448,6 +467,7 @@ func _add_house_door(house: Node3D) -> void:
 	handle_pivot.add_child(handle_bar)
 
 	house.add_child(hinge)
+	return hinge
 
 func _create_graves() -> void:
 	var grave_root: Node3D = Node3D.new()
@@ -627,6 +647,245 @@ func _create_rocks() -> void:
 	mm_instance.multimesh = mm
 	mm_instance.material_override = _rock_mat
 	rock_root.add_child(mm_instance)
+
+func _create_story_landmarks() -> void:
+	_create_road_signpost()
+	_create_broken_pole()
+	_create_story_bushes()
+	_create_symbolic_graves()
+	_create_magic_house_story()
+	_create_ruined_house_story()
+
+func _create_road_signpost() -> void:
+	var sign_root: Node3D = Node3D.new()
+	sign_root.name = "RoadSign"
+	var sx: float = 7.8
+	var sz: float = 34.8
+	sign_root.position = Vector3(sx, _sample_terrain_height(sx, sz), sz)
+	add_child(sign_root)
+
+	_add_box_segment(sign_root, Vector3(0.18, 2.45, 0.18), Vector3(-0.9, 1.22, 0.0), Vector3(0.0, 0.0, 0.04), _wood_mat, false)
+	_add_box_segment(sign_root, Vector3(0.18, 2.35, 0.18), Vector3(0.9, 1.17, 0.0), Vector3(0.0, 0.0, -0.03), _wood_mat, false)
+	_add_box_segment(sign_root, Vector3(2.6, 0.86, 0.16), Vector3(0.0, 1.88, -0.02), Vector3(0.03, 0.0, 0.0), _wood_mat, false)
+
+	var sign_text: Label3D = Label3D.new()
+	sign_text.text = "Mezit - Uc Catalli - Golge Koyu"
+	sign_text.font_size = 62
+	sign_text.modulate = Color(0.87, 0.83, 0.74, 0.95)
+	sign_text.outline_modulate = Color(0.02, 0.02, 0.02, 0.8)
+	sign_text.outline_size = 3
+	sign_text.position = Vector3(-1.16, 2.01, 0.09)
+	sign_text.rotation = Vector3(0.0, PI * 0.5, 0.0)
+	sign_root.add_child(sign_text)
+
+func _create_broken_pole() -> void:
+	var pole_root: Node3D = Node3D.new()
+	pole_root.name = "BrokenPole"
+	var px: float = -8.0
+	var pz: float = 11.5
+	pole_root.position = Vector3(px, _sample_terrain_height(px, pz), pz)
+	add_child(pole_root)
+
+	var pole_mesh: MeshInstance3D = MeshInstance3D.new()
+	var cylinder: CylinderMesh = CylinderMesh.new()
+	cylinder.top_radius = 0.11
+	cylinder.bottom_radius = 0.14
+	cylinder.height = 5.8
+	pole_mesh.mesh = cylinder
+	pole_mesh.material_override = _wood_mat
+	pole_mesh.position = Vector3(0.0, 2.9, 0.0)
+	pole_mesh.rotation = Vector3(0.1, 0.0, 0.13)
+	pole_root.add_child(pole_mesh)
+
+	var flicker_light: OmniLight3D = OmniLight3D.new()
+	flicker_light.name = "PoleLamp"
+	flicker_light.position = Vector3(0.25, 4.85, 0.11)
+	flicker_light.light_color = Color(1.0, 0.94, 0.82, 1.0)
+	flicker_light.light_energy = 0.95
+	flicker_light.omni_range = 12.0
+	flicker_light.omni_attenuation = 1.35
+	var flicker_script: Script = load("res://scripts/flicker_light.gd") as Script
+	if flicker_script != null:
+		flicker_light.set_script(flicker_script)
+	pole_root.add_child(flicker_light)
+
+func _create_story_bushes() -> void:
+	var bush_root: Node3D = Node3D.new()
+	bush_root.name = "StoryBushes"
+	add_child(bush_root)
+
+	var center: Vector2 = Vector2(2.2, 18.8)
+	for i in range(8):
+		var angle: float = float(i) * TAU / 8.0 + randf_range(-0.3, 0.3)
+		var dist: float = randf_range(2.8, 7.2)
+		var bx: float = center.x + cos(angle) * dist
+		var bz: float = center.y + sin(angle) * dist
+		var by: float = _sample_terrain_height(bx, bz)
+
+		var bush: Area3D = Area3D.new()
+		bush.name = "Bush_%d" % i
+		bush.position = Vector3(bx, by + 0.45, bz)
+		bush.set_meta("searched", false)
+		bush.set_meta("contains_key", false)
+		bush.add_to_group("story_bush")
+		bush_root.add_child(bush)
+
+		var shape_node: CollisionShape3D = CollisionShape3D.new()
+		var shape: SphereShape3D = SphereShape3D.new()
+		shape.radius = 0.9
+		shape_node.shape = shape
+		shape_node.position = Vector3(0.0, 0.2, 0.0)
+		bush.add_child(shape_node)
+
+		var bush_mesh: MeshInstance3D = MeshInstance3D.new()
+		var sphere: SphereMesh = SphereMesh.new()
+		sphere.radius = 0.9
+		sphere.height = 1.1
+		bush_mesh.mesh = sphere
+		bush_mesh.material_override = _foliage_mat
+		bush_mesh.scale = Vector3(1.0, 0.7, 1.0)
+		bush.add_child(bush_mesh)
+
+func _create_symbolic_graves() -> void:
+	var puzzle_root: Node3D = Node3D.new()
+	puzzle_root.name = "PuzzleGraves"
+	var base: Vector3 = Vector3(cemetery_center.x, _sample_terrain_height(cemetery_center.x, cemetery_center.z), cemetery_center.z)
+	puzzle_root.position = base + Vector3(0.0, 0.0, -3.0)
+	add_child(puzzle_root)
+
+	var data: Array[Dictionary] = [
+		{"symbol": "MZ", "year": 1891, "order": 0, "x": -1.5},
+		{"symbol": "UC", "year": 1938, "order": 1, "x": 0.0},
+		{"symbol": "GK", "year": 1972, "order": 2, "x": 1.5}
+	]
+
+	for i in range(data.size()):
+		var entry: Dictionary = data[i]
+		var area: Area3D = Area3D.new()
+		area.name = "SymbolGrave_%d" % i
+		area.position = Vector3(float(entry["x"]), 0.0, 0.0)
+		area.add_to_group("story_grave_symbol")
+		area.set_meta("symbol", String(entry["symbol"]))
+		area.set_meta("year", int(entry["year"]))
+		area.set_meta("order_index", int(entry["order"]))
+		puzzle_root.add_child(area)
+
+		var shape_node: CollisionShape3D = CollisionShape3D.new()
+		var box: BoxShape3D = BoxShape3D.new()
+		box.size = Vector3(0.65, 1.35, 0.35)
+		shape_node.shape = box
+		shape_node.position = Vector3(0.0, 0.68, 0.0)
+		area.add_child(shape_node)
+
+		var mesh: MeshInstance3D = MeshInstance3D.new()
+		var grave_box: BoxMesh = BoxMesh.new()
+		grave_box.size = Vector3(0.58, 1.28, 0.28)
+		mesh.mesh = grave_box
+		mesh.material_override = _grave_mat
+		mesh.position = Vector3(0.0, 0.64, 0.0)
+		area.add_child(mesh)
+
+		var label: Label3D = Label3D.new()
+		label.text = "%s\\n%d" % [String(entry["symbol"]), int(entry["year"])]
+		label.font_size = 48
+		label.position = Vector3(-0.31, 1.18, 0.16)
+		label.rotation = Vector3(0.0, PI * 0.5, 0.0)
+		label.modulate = Color(0.88, 0.9, 0.86, 0.96)
+		area.add_child(label)
+
+func _create_magic_house_story() -> void:
+	if not _house_nodes.has(1):
+		return
+	var house: Node3D = _house_nodes[1] as Node3D
+	if house == null:
+		return
+
+	var symbol_label: Label3D = Label3D.new()
+	symbol_label.text = "MZ - UC - GK"
+	symbol_label.font_size = 52
+	symbol_label.position = Vector3(-1.15, 1.84, 2.93)
+	symbol_label.rotation = Vector3(0.0, PI, 0.0)
+	symbol_label.modulate = Color(0.79, 0.17, 0.14, 0.92)
+	house.add_child(symbol_label)
+
+	_add_box_segment(house, Vector3(1.15, 0.2, 0.85), Vector3(0.0, 0.48, -0.32), Vector3.ZERO, _wood_mat, false)
+
+	var ritual_ring: MeshInstance3D = MeshInstance3D.new()
+	var ring_mesh: CylinderMesh = CylinderMesh.new()
+	ring_mesh.top_radius = 1.06
+	ring_mesh.bottom_radius = 1.06
+	ring_mesh.height = 0.04
+	ritual_ring.mesh = ring_mesh
+	ritual_ring.material_override = _grave_mat
+	ritual_ring.position = Vector3(0.0, 0.03, -0.4)
+	house.add_child(ritual_ring)
+
+	var entry_area: Area3D = Area3D.new()
+	entry_area.name = "MagicHouseEntry"
+	entry_area.position = Vector3(0.0, 0.9, 1.1)
+	entry_area.add_to_group("story_magic_house_entry")
+	var entry_shape: CollisionShape3D = CollisionShape3D.new()
+	var entry_box: BoxShape3D = BoxShape3D.new()
+	entry_box.size = Vector3(1.5, 1.8, 1.5)
+	entry_shape.shape = entry_box
+	entry_area.add_child(entry_shape)
+	house.add_child(entry_area)
+
+	var candle_positions: Array[Vector3] = [
+		Vector3(-0.65, 0.42, -0.95),
+		Vector3(0.63, 0.42, -0.9),
+		Vector3(-0.74, 0.42, 0.1),
+		Vector3(0.76, 0.42, 0.05)
+	]
+	for i in range(candle_positions.size()):
+		var candle: Area3D = Area3D.new()
+		candle.name = "RitualCandle_%d" % i
+		candle.position = candle_positions[i]
+		candle.add_to_group("story_candle")
+		candle.set_meta("candle_index", i)
+		candle.set_meta("lit", false)
+		house.add_child(candle)
+
+		var candle_shape_node: CollisionShape3D = CollisionShape3D.new()
+		var candle_shape: SphereShape3D = SphereShape3D.new()
+		candle_shape.radius = 0.28
+		candle_shape_node.shape = candle_shape
+		candle_shape_node.position = Vector3(0.0, 0.26, 0.0)
+		candle.add_child(candle_shape_node)
+
+		var candle_mesh: MeshInstance3D = MeshInstance3D.new()
+		var candle_body: CylinderMesh = CylinderMesh.new()
+		candle_body.top_radius = 0.06
+		candle_body.bottom_radius = 0.065
+		candle_body.height = 0.36
+		candle_mesh.mesh = candle_body
+		candle_mesh.position = Vector3(0.0, 0.18, 0.0)
+		candle_mesh.material_override = _wood_mat
+		candle.add_child(candle_mesh)
+
+		var flame: OmniLight3D = OmniLight3D.new()
+		flame.name = "FlameLight"
+		flame.position = Vector3(0.0, 0.38, 0.0)
+		flame.light_color = Color(1.0, 0.69, 0.34, 1.0)
+		flame.light_energy = 0.0
+		flame.omni_range = 3.2
+		flame.visible = false
+		candle.add_child(flame)
+
+func _create_ruined_house_story() -> void:
+	if not _house_nodes.has(2):
+		return
+	var house: Node3D = _house_nodes[2] as Node3D
+	if house == null:
+		return
+
+	var warning_label: Label3D = Label3D.new()
+	warning_label.text = "Bodrumdan ses geliyor..."
+	warning_label.font_size = 42
+	warning_label.position = Vector3(-1.3, 0.4, -1.75)
+	warning_label.rotation = Vector3(0.0, 0.26, 0.0)
+	warning_label.modulate = Color(0.84, 0.82, 0.78, 0.8)
+	house.add_child(warning_label)
 
 func _random_ring_position(min_radius: float, max_radius: float) -> Vector3:
 	var a: float = randf() * TAU

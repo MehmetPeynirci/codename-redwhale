@@ -4,18 +4,22 @@ extends Node3D
 @export var fallback_visual_path: NodePath = NodePath("FallbackVisual")
 @export var collision_shape_path: NodePath = NodePath("CarBody/CollisionShape3D")
 @export var model_scene_candidates: PackedStringArray = PackedStringArray([
+	"res://small-price-car/source/NEXIA DONE.fbx",
 	"res://small-price-car/source/NEXIA DONE.glb",
-	"res://small-price-car/source/NEXIA DONE.gltf",
-	"res://small-price-car/source/NEXIA DONE.fbx"
+	"res://small-price-car/source/NEXIA DONE.gltf"
 ])
 @export var target_length: float = 4.6
 @export var target_width: float = 1.95
 @export var y_rotation_offset_deg: float = 0.0
+@export var model_ground_offset: float = -0.06
 
 var _model_root: Node3D
 var _fallback_visual: Node3D
 var _collision_shape: CollisionShape3D
 var _active_model: Node3D
+var _texture_cache: Dictionary = {}
+var _missing_texture_files: Dictionary = {}
+var _imported_texture_path_cache: Dictionary = {}
 
 func _ready() -> void:
 	_model_root = get_node_or_null(model_root_path) as Node3D
@@ -39,20 +43,76 @@ func _ready() -> void:
 		_update_collision_shape()
 
 func _try_spawn_external_model() -> Node3D:
-	for path_variant in model_scene_candidates:
+	var candidate_paths: PackedStringArray = _build_candidate_paths()
+	for path_variant in candidate_paths:
 		var path: String = str(path_variant)
-		if not ResourceLoader.exists(path, "PackedScene"):
+		if not ResourceLoader.exists(path):
 			continue
-		var packed: PackedScene = load(path) as PackedScene
-		if packed == null:
+		var res: Resource = load(path)
+		if res == null:
 			continue
+		var spawned: Node3D = _spawn_from_resource(res)
+		if spawned != null:
+			_model_root.add_child(spawned)
+			return spawned
+	return null
+
+func _build_candidate_paths() -> PackedStringArray:
+	var ordered: PackedStringArray = PackedStringArray()
+	var seen: Dictionary = {}
+	for raw_path in model_scene_candidates:
+		var path: String = str(raw_path)
+		if seen.has(path):
+			continue
+		seen[path] = true
+		ordered.append(path)
+
+	for imported_path in _discover_imported_scene_paths():
+		var path: String = str(imported_path)
+		if seen.has(path):
+			continue
+		seen[path] = true
+		ordered.append(path)
+	return ordered
+
+func _discover_imported_scene_paths() -> PackedStringArray:
+	var result: PackedStringArray = PackedStringArray()
+	var dir: DirAccess = DirAccess.open("res://.godot/imported")
+	if dir == null:
+		return result
+
+	dir.list_dir_begin()
+	while true:
+		var entry: String = dir.get_next()
+		if entry == "":
+			break
+		if dir.current_is_dir():
+			continue
+
+		var lower: String = entry.to_lower()
+		if lower.begins_with("nexia done.fbx-") and (lower.ends_with(".scn") or lower.ends_with(".tscn") or lower.ends_with(".res")):
+			result.append("res://.godot/imported/" + entry)
+		elif lower.begins_with("nexia done.glb-") and (lower.ends_with(".scn") or lower.ends_with(".tscn") or lower.ends_with(".res")):
+			result.append("res://.godot/imported/" + entry)
+		elif lower.begins_with("nexia done.gltf-") and (lower.ends_with(".scn") or lower.ends_with(".tscn") or lower.ends_with(".res")):
+			result.append("res://.godot/imported/" + entry)
+	dir.list_dir_end()
+	return result
+
+func _spawn_from_resource(res: Resource) -> Node3D:
+	if res is PackedScene:
+		var packed: PackedScene = res as PackedScene
 		var inst: Node = packed.instantiate()
 		var inst3d: Node3D = inst as Node3D
 		if inst3d == null:
 			inst.queue_free()
-			continue
-		_model_root.add_child(inst3d)
+			return null
 		return inst3d
+
+	if res is Mesh:
+		var mesh_instance: MeshInstance3D = MeshInstance3D.new()
+		mesh_instance.mesh = res as Mesh
+		return mesh_instance
 	return null
 
 func _fit_model_to_target() -> void:
@@ -71,11 +131,13 @@ func _fit_model_to_target() -> void:
 	var uniform_scale: float = target_length / horizontal_span
 	_active_model.scale = Vector3.ONE * uniform_scale
 
-	var scaled_bounds: AABB = _compute_bounds(_collect_meshes(_active_model))
+	var scaled_meshes: Array[MeshInstance3D] = _collect_meshes(_active_model)
+	var scaled_bounds: AABB = _compute_bounds(scaled_meshes)
 	var center_x: float = scaled_bounds.position.x + scaled_bounds.size.x * 0.5
 	var center_z: float = scaled_bounds.position.z + scaled_bounds.size.z * 0.5
-	var bottom_y: float = scaled_bounds.position.y
-	_active_model.position -= Vector3(center_x, bottom_y, center_z)
+	var contact_bottom_y: float = _compute_contact_bottom_y(scaled_meshes)
+	_active_model.position -= Vector3(center_x, contact_bottom_y, center_z)
+	_active_model.position.y += model_ground_offset
 
 func _update_collision_shape() -> void:
 	if _collision_shape == null:
@@ -168,10 +230,79 @@ func _create_mat(prefix: String, include_metallic: bool) -> Material:
 	return mat
 
 func _load_tex(file_name: String) -> Texture2D:
-	var path: String = "res://small-price-car/textures/" + file_name
+	var clean_name: String = file_name.strip_edges()
+	if clean_name == "":
+		return null
+	if _missing_texture_files.has(clean_name):
+		return null
+	if _texture_cache.has(clean_name):
+		return _texture_cache.get(clean_name) as Texture2D
+
+	var path: String = "res://small-price-car/textures/" + clean_name
+	if not FileAccess.file_exists(path):
+		_missing_texture_files[clean_name] = true
+		return null
+
+	var imported_path: String = _resolve_imported_texture_path(path)
+	if imported_path != "" and ResourceLoader.exists(imported_path):
+		var imported_tex: Texture2D = ResourceLoader.load(imported_path) as Texture2D
+		if imported_tex != null:
+			_texture_cache[clean_name] = imported_tex
+			return imported_tex
+
+	var ext: String = path.get_extension().to_lower()
+	if ext == "png" or ext == "jpg" or ext == "jpeg" or ext == "webp":
+		var bytes: PackedByteArray = FileAccess.get_file_as_bytes(path)
+		if not bytes.is_empty():
+			var image: Image = Image.new()
+			var image_err: int = _load_image_from_buffer(image, bytes, ext)
+			if image_err == OK:
+				var tex_from_image: ImageTexture = ImageTexture.create_from_image(image)
+				_texture_cache[clean_name] = tex_from_image
+				return tex_from_image
+
 	if ResourceLoader.exists(path):
-		return load(path) as Texture2D
+		var loaded: Texture2D = ResourceLoader.load(path) as Texture2D
+		if loaded != null:
+			_texture_cache[clean_name] = loaded
+			return loaded
+
+	_missing_texture_files[clean_name] = true
 	return null
+
+func _resolve_imported_texture_path(source_path: String) -> String:
+	if _imported_texture_path_cache.has(source_path):
+		return str(_imported_texture_path_cache.get(source_path))
+
+	var import_cfg_path: String = source_path + ".import"
+	if not FileAccess.file_exists(import_cfg_path):
+		_imported_texture_path_cache[source_path] = ""
+		return ""
+
+	var file: FileAccess = FileAccess.open(import_cfg_path, FileAccess.READ)
+	if file == null:
+		_imported_texture_path_cache[source_path] = ""
+		return ""
+
+	var remap_path: String = ""
+	while not file.eof_reached():
+		var line: String = file.get_line()
+		if line.begins_with("path=\""):
+			remap_path = line.trim_prefix("path=\"").trim_suffix("\"")
+			break
+	file.close()
+
+	_imported_texture_path_cache[source_path] = remap_path
+	return remap_path
+
+func _load_image_from_buffer(image: Image, bytes: PackedByteArray, ext: String) -> int:
+	if ext == "png":
+		return image.load_png_from_buffer(bytes)
+	if ext == "jpg" or ext == "jpeg":
+		return image.load_jpg_from_buffer(bytes)
+	if ext == "webp":
+		return image.load_webp_from_buffer(bytes)
+	return ERR_UNAVAILABLE
 
 func _choose_material_key(node_name: String) -> String:
 	if node_name.contains("wheel_panel"):
@@ -248,6 +379,40 @@ func _compute_bounds(meshes: Array[MeshInstance3D]) -> AABB:
 	if not has_point:
 		return AABB(Vector3.ZERO, Vector3.ZERO)
 	return AABB(min_v, max_v - min_v)
+
+func _compute_contact_bottom_y(meshes: Array[MeshInstance3D]) -> float:
+	if _active_model == null:
+		return 0.0
+
+	var inv: Transform3D = _active_model.global_transform.affine_inverse()
+	var min_any: float = INF
+	var min_wheel: float = INF
+
+	for mesh_instance in meshes:
+		if mesh_instance.mesh == null:
+			continue
+
+		var mesh_xf: Transform3D = inv * mesh_instance.global_transform
+		var mesh_aabb: AABB = mesh_instance.mesh.get_aabb()
+		var local_min_y: float = INF
+
+		for corner in _aabb_corners(mesh_aabb):
+			var p: Vector3 = mesh_xf * corner
+			min_any = minf(min_any, p.y)
+			local_min_y = minf(local_min_y, p.y)
+
+		if _is_wheel_mesh(mesh_instance.name):
+			min_wheel = minf(min_wheel, local_min_y)
+
+	if min_wheel < INF:
+		return min_wheel
+	if min_any < INF:
+		return min_any
+	return 0.0
+
+func _is_wheel_mesh(mesh_name: String) -> bool:
+	var lowered: String = mesh_name.to_lower()
+	return lowered.contains("wheel") or lowered.contains("tire") or lowered.contains("tyre") or lowered.contains("lastik")
 
 func _aabb_corners(aabb: AABB) -> Array[Vector3]:
 	var p: Vector3 = aabb.position

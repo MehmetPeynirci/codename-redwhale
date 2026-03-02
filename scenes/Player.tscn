@@ -1,10 +1,31 @@
-[gd_scene load_steps=3 format=3 uid="uid://ce1h1rb4kxy1p"]
+[gd_scene load_steps=7 format=3 uid="uid://ce1h1rb4kxy1p"]
 
 [ext_resource type="Script" path="res://scripts/player_controller.gd" id="1_w0k5l"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_0q3as"]
 radius = 0.35
 height = 1.2
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_nv_body"]
+albedo_color = Color(0.075, 0.08, 0.085, 1)
+roughness = 0.88
+metallic = 0.25
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_nv_lens"]
+albedo_color = Color(0.09, 0.24, 0.09, 1)
+roughness = 0.14
+metallic = 0.1
+emission_enabled = true
+emission = Color(0.16, 0.86, 0.22, 1)
+emission_energy_multiplier = 1.2
+
+[sub_resource type="BoxMesh" id="BoxMesh_nv_body"]
+size = Vector3(0.19, 0.1, 0.24)
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_nv_lens"]
+top_radius = 0.04
+bottom_radius = 0.04
+height = 0.07
 
 [node name="Player" type="CharacterBody3D"]
 script = ExtResource("1_w0k5l")
@@ -20,3 +41,27 @@ position = Vector3(0, 1.6, 0)
 current = true
 fov = 88.0
 near = 0.03
+
+[node name="NightVisionRig" type="Node3D" parent="Head"]
+position = Vector3(0.16, -0.14, -0.24)
+rotation = Vector3(-0.06, 0.11, 0.03)
+
+[node name="CameraBody" type="MeshInstance3D" parent="Head/NightVisionRig"]
+mesh = SubResource("BoxMesh_nv_body")
+material_override = SubResource("StandardMaterial3D_nv_body")
+
+[node name="CameraLens" type="MeshInstance3D" parent="Head/NightVisionRig"]
+position = Vector3(0, 0.0, -0.145)
+rotation = Vector3(1.5708, 0, 0)
+mesh = SubResource("CylinderMesh_nv_lens")
+material_override = SubResource("StandardMaterial3D_nv_lens")
+
+[node name="IRIlluminator" type="SpotLight3D" parent="Head/NightVisionRig"]
+position = Vector3(0, 0.0, -0.18)
+light_color = Color(0.3, 1, 0.36, 1)
+light_energy = 3.8
+light_specular = 0.0
+shadow_enabled = false
+spot_range = 20.0
+spot_attenuation = 0.96
+spot_angle = 52.0
