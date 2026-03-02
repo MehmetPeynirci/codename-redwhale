@@ -1,7 +1,9 @@
-[gd_scene load_steps=5 format=3 uid="uid://bhf0s2f4r6m2q"]
+[gd_scene load_steps=8 format=3 uid="uid://bhf0s2f4r6m2q"]
 
 [ext_resource type="PackedScene" path="res://scenes/Player.tscn" id="1_player"]
 [ext_resource type="PackedScene" path="res://scenes/Village.tscn" id="2_village"]
+[ext_resource type="PackedScene" path="res://scenes/CrashCar.tscn" id="3_car"]
+[ext_resource type="Script" path="res://scripts/crash_sequence.gd" id="4_crash"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_p61hl"]
 sky_horizon_color = Color(0.33, 0.35, 0.37, 1)
@@ -34,8 +36,18 @@ environment = SubResource("Environment_j35wl")
 
 [node name="Village" parent="." instance=ExtResource("2_village")]
 
+[node name="CrashCar" parent="." instance=ExtResource("3_car")]
+transform = Transform3D(0.985585, 0, 0.169182, 0, 1, 0, -0.169182, 0, 0.985585, 2.5, 0, 17)
+
 [node name="Player" parent="." instance=ExtResource("1_player")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 6)
+transform = Transform3D(0.985585, 0, 0.169182, 0, 1, 0, -0.169182, 0, 0.985585, 2.98, 0.95, 17.35)
+
+[node name="CrashSequence" type="Node3D" parent="."]
+script = ExtResource("4_crash")
+player_path = NodePath("../Player")
+car_path = NodePath("../CrashCar")
+seat_marker_path = NodePath("../CrashCar/SeatMarker")
+exit_marker_path = NodePath("../CrashCar/ExitMarker")
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
 transform = Transform3D(0.965926, -0.258819, 0, 0.183013, 0.683013, -0.707107, 0.183013, 0.683013, 0.707107, 0, 9, 0)
