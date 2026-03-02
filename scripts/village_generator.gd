@@ -2,13 +2,13 @@ extends Node3D
 
 @export var grave_count: int = 14
 @export var village_radius: float = 90.0
-@export var tree_count: int = 92
-@export var grass_count: int = 2800
-@export var rock_count: int = 135
+@export var tree_count: int = 84
+@export var grass_count: int = 2000
+@export var rock_count: int = 118
 @export var cemetery_center: Vector3 = Vector3(-30.0, 0.0, 10.0)
 @export var cemetery_half_extents: Vector2 = Vector2(4.0, 6.5)
 
-@export var terrain_resolution: int = 128
+@export var terrain_resolution: int = 88
 @export var terrain_height: float = 2.8
 @export var terrain_base_frequency: float = 0.019
 @export var terrain_detail_frequency: float = 0.062
@@ -18,7 +18,7 @@ extends Node3D
 @export var road_width: float = 5.4
 @export var road_shoulder_width: float = 2.6
 @export var road_height_offset: float = 0.035
-@export var road_samples_per_segment: int = 22
+@export var road_samples_per_segment: int = 14
 @export var road_path_points: PackedVector3Array = PackedVector3Array([
 	Vector3(7.5, 0.0, 37.0),
 	Vector3(4.6, 0.0, 19.0),
@@ -223,10 +223,19 @@ func _build_terrain_mesh() -> ArrayMesh:
 	var surface: SurfaceTool = SurfaceTool.new()
 	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
 
-	var resolution: int = maxi(terrain_resolution, 40)
+	var resolution: int = clampi(terrain_resolution, 48, 120)
+	var grid_size: int = resolution + 1
 	var span: float = village_radius * 2.0
 	var step: float = span / float(resolution)
 	var half: float = village_radius
+	var heights: PackedFloat32Array = PackedFloat32Array()
+	heights.resize(grid_size * grid_size)
+
+	for z in range(grid_size):
+		for x in range(grid_size):
+			var px: float = -half + float(x) * step
+			var pz: float = -half + float(z) * step
+			heights[_height_index(x, z, grid_size)] = _sample_terrain_height(px, pz)
 
 	for z in range(resolution):
 		for x in range(resolution):
@@ -235,10 +244,15 @@ func _build_terrain_mesh() -> ArrayMesh:
 			var z0: float = -half + float(z) * step
 			var z1: float = z0 + step
 
-			var p00: Vector3 = Vector3(x0, _sample_terrain_height(x0, z0), z0)
-			var p10: Vector3 = Vector3(x1, _sample_terrain_height(x1, z0), z0)
-			var p11: Vector3 = Vector3(x1, _sample_terrain_height(x1, z1), z1)
-			var p01: Vector3 = Vector3(x0, _sample_terrain_height(x0, z1), z1)
+			var h00: float = heights[_height_index(x, z, grid_size)]
+			var h10: float = heights[_height_index(x + 1, z, grid_size)]
+			var h11: float = heights[_height_index(x + 1, z + 1, grid_size)]
+			var h01: float = heights[_height_index(x, z + 1, grid_size)]
+
+			var p00: Vector3 = Vector3(x0, h00, z0)
+			var p10: Vector3 = Vector3(x1, h10, z0)
+			var p11: Vector3 = Vector3(x1, h11, z1)
+			var p01: Vector3 = Vector3(x0, h01, z1)
 
 			var uv00: Vector2 = Vector2((x0 + half) / span, (z0 + half) / span)
 			var uv10: Vector2 = Vector2((x1 + half) / span, (z0 + half) / span)
@@ -251,6 +265,9 @@ func _build_terrain_mesh() -> ArrayMesh:
 	surface.generate_normals()
 	surface.generate_tangents()
 	return surface.commit()
+
+func _height_index(x: int, z: int, row_size: int) -> int:
+	return (z * row_size) + x
 
 func _add_terrain_triangle(surface: SurfaceTool, a: Vector3, b: Vector3, c: Vector3, uv_a: Vector2, uv_b: Vector2, uv_c: Vector2) -> void:
 	surface.set_uv(uv_a)
@@ -556,7 +573,7 @@ func _create_foliage() -> void:
 
 	var placed: int = 0
 	var attempts: int = 0
-	var max_attempts: int = grass_count * 6
+	var max_attempts: int = grass_count * 4
 	while placed < grass_count and attempts < max_attempts:
 		attempts += 1
 		var p: Vector3 = _random_ring_position(6.0, village_radius - 5.0)
