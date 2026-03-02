@@ -28,6 +28,7 @@ extends CharacterBody3D
 @export var camera_sway_strength: float = 0.015
 @export var landing_bump_strength: float = 0.08
 @export var landing_recover_speed: float = 10.0
+@export var camera_roll_sway_enabled: bool = false
 
 @export var intro_duration: float = 5.8
 @export var intro_prone_height: float = 0.53
@@ -87,8 +88,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		rotate_y(-event.relative.x * mouse_sensitivity)
 		_pitch = clampf(_pitch - event.relative.y * mouse_sensitivity, deg_to_rad(-88.0), deg_to_rad(88.0))
 		head.rotation.x = _pitch
-		_mouse_sway.x = clampf(_mouse_sway.x + event.relative.x * 0.00003, -camera_sway_strength, camera_sway_strength)
-		_mouse_sway.y = clampf(_mouse_sway.y + event.relative.y * 0.00002, -camera_sway_strength, camera_sway_strength)
+		if camera_roll_sway_enabled:
+			_mouse_sway.x = clampf(_mouse_sway.x + event.relative.x * 0.00003, -camera_sway_strength, camera_sway_strength)
+			_mouse_sway.y = clampf(_mouse_sway.y + event.relative.y * 0.00002, -camera_sway_strength, camera_sway_strength)
 
 func _physics_process(delta: float) -> void:
 	_elapsed_time += delta
@@ -294,6 +296,11 @@ func _update_camera_effects(delta: float, input_dir: Vector2) -> void:
 	elif Input.is_action_pressed("move_sprint") and is_on_floor() and input_dir.y < -0.1 and not _is_injured_phase():
 		target_fov = sprint_fov
 	camera.fov = lerpf(camera.fov, target_fov, minf(1.0, fov_lerp_speed * delta))
+
+	if not camera_roll_sway_enabled:
+		camera.rotation = Vector3.ZERO
+		camera.position = _camera_base_pos
+		return
 
 	var limp_roll: float = sin(_injury_elapsed * 7.0) * 0.035 if _is_injured_phase() else 0.0
 	var target_roll: float = -input_dir.x * camera_tilt_strength + _mouse_sway.x + limp_roll
