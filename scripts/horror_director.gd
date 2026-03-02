@@ -103,6 +103,7 @@ func _update_stage_flow() -> void:
 func _try_interact() -> void:
 	if _stage == StoryStage.CHECK_AREA:
 		if _is_area_near_player(_trunk_area):
+			_set_car_trunk_open(true)
 			if not _trunk_checked:
 				_trunk_checked = true
 				_set_objective("Bagaj kontrol edildi.", "Simdi cevredeki calilari arastir.")
@@ -444,6 +445,12 @@ func _set_objective(main_text: String, detail_text: String) -> void:
 	if _objective_bg != null:
 		_objective_bg.visible = main_text != "" or detail_text != ""
 
+func _set_car_trunk_open(opened: bool) -> void:
+	if _car == null:
+		return
+	if _car.has_method("set_trunk_open"):
+		_car.call("set_trunk_open", opened)
+
 func _update_interaction_hint() -> void:
 	if _hint_bg == null or _hint_label == null:
 		return
@@ -451,7 +458,7 @@ func _update_interaction_hint() -> void:
 
 	if _stage == StoryStage.CHECK_AREA:
 		if _is_area_near_player(_trunk_area):
-			hint = "Bagaji kontrol et (E)"
+			hint = "Bagaji ac ve kontrol et (E)"
 		elif _nearest_area(_bush_areas) != null:
 			hint = "Caliyi incele (E)"
 	elif _stage == StoryStage.FIND_NOTEBOOK and _is_area_near_player(_notebook_area):

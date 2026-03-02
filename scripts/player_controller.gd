@@ -36,10 +36,10 @@ extends CharacterBody3D
 @export var injury_default_duration: float = 15.0
 @export var injury_speed_multiplier: float = 0.72
 @export var night_vision_starts_on: bool = false
-@export var night_vision_ir_energy: float = 3.8
-@export var night_vision_ir_range: float = 20.0
-@export var night_vision_ir_angle: float = 52.0
-@export var night_vision_ir_attenuation: float = 0.96
+@export var night_vision_ir_energy: float = 9.2
+@export var night_vision_ir_range: float = 34.0
+@export var night_vision_ir_angle: float = 72.0
+@export var night_vision_ir_attenuation: float = 0.84
 @export var night_vision_ir_color: Color = Color(0.30, 1.0, 0.36, 1.0)
 @export var night_vision_ir_shadow_enabled: bool = false
 @export var night_vision_unlock_prompt_duration: float = 5.0

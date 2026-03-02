@@ -1,4 +1,4 @@
-[gd_scene load_steps=12 format=3 uid="uid://dylay8m3h5wjj"]
+[gd_scene load_steps=13 format=3 uid="uid://dylay8m3h5wjj"]
 
 [ext_resource type="Script" path="res://scripts/car_visual_adapter.gd" id="1_adapter"]
 [ext_resource type="Shader" path="res://shaders/car_paint.gdshader" id="2_carshader"]
@@ -19,6 +19,9 @@ size = Vector3(2.2, 0.58, 4.55)
 
 [sub_resource type="BoxMesh" id="BoxMesh_cabin"]
 size = Vector3(1.85, 0.7, 2.0)
+
+[sub_resource type="BoxMesh" id="BoxMesh_trunk_lid"]
+size = Vector3(1.62, 0.08, 1.02)
 
 [sub_resource type="CylinderMesh" id="CylinderMesh_wheel"]
 top_radius = 0.36
@@ -85,6 +88,14 @@ position = Vector3(1.05, 0.36, -1.45)
 rotation = Vector3(0, 0, 1.5708)
 mesh = SubResource("CylinderMesh_wheel")
 material_override = SubResource("StandardMaterial3D_tire")
+
+[node name="StoryTrunkHinge" type="Node3D" parent="."]
+position = Vector3(0, 0.95, 1.45)
+
+[node name="StoryTrunkLid" type="MeshInstance3D" parent="StoryTrunkHinge"]
+position = Vector3(0, 0, 0.5)
+mesh = SubResource("BoxMesh_trunk_lid")
+material_override = SubResource("ShaderMaterial_car")
 
 [node name="SeatMarker" type="Marker3D" parent="."]
 position = Vector3(0.34, 1.02, 0.3)

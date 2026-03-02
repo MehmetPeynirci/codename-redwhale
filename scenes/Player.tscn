@@ -59,9 +59,9 @@ material_override = SubResource("StandardMaterial3D_nv_lens")
 [node name="IRIlluminator" type="SpotLight3D" parent="Head/NightVisionRig"]
 position = Vector3(0, 0.0, -0.18)
 light_color = Color(0.3, 1, 0.36, 1)
-light_energy = 3.8
+light_energy = 9.2
 light_specular = 0.0
 shadow_enabled = false
-spot_range = 20.0
-spot_attenuation = 0.96
-spot_angle = 52.0
+spot_range = 34.0
+spot_attenuation = 0.84
+spot_angle = 72.0

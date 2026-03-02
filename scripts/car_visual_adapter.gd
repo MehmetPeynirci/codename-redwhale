@@ -12,11 +12,18 @@ extends Node3D
 @export var target_width: float = 1.95
 @export var y_rotation_offset_deg: float = 0.0
 @export var model_ground_offset: float = -0.06
+@export var trunk_hinge_path: NodePath = NodePath("StoryTrunkHinge")
+@export var trunk_open_angle_deg: float = 56.0
+@export var trunk_open_duration: float = 0.52
 
 var _model_root: Node3D
 var _fallback_visual: Node3D
 var _collision_shape: CollisionShape3D
 var _active_model: Node3D
+var _trunk_hinge: Node3D
+var _trunk_tween: Tween
+var _trunk_closed_rotation_x: float = 0.0
+var _trunk_open: bool = false
 var _texture_cache: Dictionary = {}
 var _missing_texture_files: Dictionary = {}
 var _imported_texture_path_cache: Dictionary = {}
@@ -25,6 +32,7 @@ func _ready() -> void:
 	_model_root = get_node_or_null(model_root_path) as Node3D
 	_fallback_visual = get_node_or_null(fallback_visual_path) as Node3D
 	_collision_shape = get_node_or_null(collision_shape_path) as CollisionShape3D
+	_cache_trunk_hinge()
 	if _model_root == null:
 		return
 
@@ -41,6 +49,40 @@ func _ready() -> void:
 		if _fallback_visual != null:
 			_fallback_visual.visible = true
 		_update_collision_shape()
+
+func set_trunk_open(opened: bool) -> void:
+	_cache_trunk_hinge()
+	if _trunk_hinge == null:
+		return
+
+	if _trunk_open == opened and (_trunk_tween == null or not _trunk_tween.is_running()):
+		return
+	_trunk_open = opened
+
+	if _trunk_tween != null and _trunk_tween.is_running():
+		_trunk_tween.kill()
+
+	var target_x: float = _trunk_closed_rotation_x
+	if opened:
+		target_x += deg_to_rad(-absf(trunk_open_angle_deg))
+
+	_trunk_tween = create_tween()
+	_trunk_tween.set_trans(Tween.TRANS_SINE)
+	_trunk_tween.set_ease(Tween.EASE_IN_OUT)
+	_trunk_tween.tween_property(_trunk_hinge, "rotation:x", target_x, trunk_open_duration)
+
+func toggle_trunk() -> void:
+	set_trunk_open(not _trunk_open)
+
+func is_trunk_open() -> bool:
+	return _trunk_open
+
+func _cache_trunk_hinge() -> void:
+	if _trunk_hinge != null:
+		return
+	_trunk_hinge = get_node_or_null(trunk_hinge_path) as Node3D
+	if _trunk_hinge != null:
+		_trunk_closed_rotation_x = _trunk_hinge.rotation.x
 
 func _try_spawn_external_model() -> Node3D:
 	var candidate_paths: PackedStringArray = _build_candidate_paths()
