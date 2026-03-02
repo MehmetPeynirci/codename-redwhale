@@ -1,30 +1,45 @@
-[gd_scene load_steps=4 format=3 uid="uid://bhf0s2f4r6m2q"]
+[gd_scene load_steps=5 format=3 uid="uid://bhf0s2f4r6m2q"]
 
-[ext_resource type="PackedScene" path="res://scenes/Player.tscn" id="1_l5f8r"]
+[ext_resource type="PackedScene" path="res://scenes/Player.tscn" id="1_player"]
+[ext_resource type="PackedScene" path="res://scenes/Village.tscn" id="2_village"]
 
-[sub_resource type="BoxMesh" id="BoxMesh_o06ei"]
-size = Vector3(100, 1, 100)
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_p61hl"]
+sky_horizon_color = Color(0.33, 0.35, 0.37, 1)
+sky_top_color = Color(0.13, 0.15, 0.17, 1)
+ground_horizon_color = Color(0.06, 0.06, 0.06, 1)
+ground_bottom_color = Color(0.03, 0.03, 0.03, 1)
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_l111x"]
-size = Vector3(100, 1, 100)
+[sub_resource type="Sky" id="Sky_4hgrx"]
+sky_material = SubResource("ProceduralSkyMaterial_p61hl")
+
+[sub_resource type="Environment" id="Environment_j35wl"]
+background_mode = 2
+sky = SubResource("Sky_4hgrx")
+ambient_light_source = 3
+ambient_light_color = Color(0.38, 0.4, 0.42, 1)
+ambient_light_energy = 0.8
+fog_enabled = true
+fog_light_energy = 0.65
+fog_density = 0.018
+volumetric_fog_enabled = true
+volumetric_fog_density = 0.03
+adjustment_enabled = true
+adjustment_brightness = 0.92
+adjustment_contrast = 1.07
 
 [node name="Main" type="Node3D"]
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_j35wl")
 
-[node name="Player" parent="." instance=ExtResource("1_l5f8r")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0)
+[node name="Village" parent="." instance=ExtResource("2_village")]
+
+[node name="Player" parent="." instance=ExtResource("1_player")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 6)
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
-transform = Transform3D(0.866025, -0.5, 0, 0.353553, 0.612373, -0.707107, 0.353553, 0.612372, 0.707107, 0, 8, 0)
+transform = Transform3D(0.965926, -0.258819, 0, 0.183013, 0.683013, -0.707107, 0.183013, 0.683013, 0.707107, 0, 9, 0)
+light_energy = 0.78
+light_color = Color(0.74, 0.76, 0.79, 1)
 shadow_enabled = true
-
-[node name="FloorVisual" type="MeshInstance3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
-mesh = SubResource("BoxMesh_o06ei")
-
-[node name="FloorBody" type="StaticBody3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="FloorBody"]
-shape = SubResource("BoxShape3D_l111x")
+shadow_blur = 1.6

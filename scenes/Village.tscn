@@ -1,0 +1,10 @@
+[gd_scene load_steps=3 format=3 uid="uid://b4wcx18ktxbr6"]
+
+[ext_resource type="Script" path="res://scripts/village_generator.gd" id="1_hqk8k"]
+[ext_resource type="Script" path="res://scripts/rain_controller.gd" id="2_8jcb8"]
+
+[node name="Village" type="Node3D"]
+script = ExtResource("1_hqk8k")
+
+[node name="RainController" type="Node3D" parent="."]
+script = ExtResource("2_8jcb8")
