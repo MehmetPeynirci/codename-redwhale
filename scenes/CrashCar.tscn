@@ -1,89 +1,30 @@
-[gd_scene load_steps=10 format=3 uid="uid://dylay8m3h5wjj"]
+[gd_scene load_steps=4 format=3 uid="uid://dylay8m3h5wjj"]
 
-[ext_resource type="Shader" path="res://shaders/car_paint.gdshader" id="1_carshader"]
-[ext_resource type="Shader" path="res://shaders/broken_glass.gdshader" id="2_glassshader"]
-
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_car"]
-shader = ExtResource("1_carshader")
-
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_glass"]
-shader = ExtResource("2_glassshader")
-
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_tire"]
-albedo_color = Color(0.06, 0.06, 0.06, 1)
-roughness = 0.88
-
-[sub_resource type="BoxMesh" id="BoxMesh_body"]
-size = Vector3(2.2, 0.58, 4.55)
-
-[sub_resource type="BoxMesh" id="BoxMesh_cabin"]
-size = Vector3(1.85, 0.7, 2.0)
-
-[sub_resource type="CylinderMesh" id="CylinderMesh_wheel"]
-top_radius = 0.36
-bottom_radius = 0.36
-height = 0.24
-
-[sub_resource type="QuadMesh" id="QuadMesh_glass"]
-size = Vector2(1.3, 0.7)
+[ext_resource type="Script" path="res://scripts/car_visual_adapter.gd" id="1_adapter"]
+[ext_resource type="PackedScene" path="res://small-price-car/source/NEXIA DONE.fbx" id="2_model"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_collision"]
-size = Vector3(2.2, 1.05, 4.55)
+size = Vector3(1.95, 1.15, 4.6)
 
 [node name="CrashCar" type="Node3D"]
+script = ExtResource("1_adapter")
 
 [node name="CarBody" type="StaticBody3D" parent="."]
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="CarBody"]
-position = Vector3(0, 0.54, 0)
+position = Vector3(0, 0.575, 0)
 shape = SubResource("BoxShape3D_collision")
 
-[node name="BodyVisual" type="MeshInstance3D" parent="."]
-position = Vector3(0, 0.35, 0)
-mesh = SubResource("BoxMesh_body")
-material_override = SubResource("ShaderMaterial_car")
+[node name="ModelPivot" type="Node3D" parent="."]
 
-[node name="CabinVisual" type="MeshInstance3D" parent="."]
-position = Vector3(0, 0.85, -0.15)
-mesh = SubResource("BoxMesh_cabin")
-material_override = SubResource("ShaderMaterial_car")
-
-[node name="Windshield" type="MeshInstance3D" parent="."]
-position = Vector3(0, 1.0, 0.78)
-rotation = Vector3(-0.45, 0, 0)
-mesh = SubResource("QuadMesh_glass")
-material_override = SubResource("ShaderMaterial_glass")
-
-[node name="WheelFL" type="MeshInstance3D" parent="."]
-position = Vector3(-1.05, 0.36, 1.42)
-rotation = Vector3(0, 0, 1.5708)
-mesh = SubResource("CylinderMesh_wheel")
-material_override = SubResource("StandardMaterial3D_tire")
-
-[node name="WheelFR" type="MeshInstance3D" parent="."]
-position = Vector3(1.05, 0.36, 1.42)
-rotation = Vector3(0, 0, 1.5708)
-mesh = SubResource("CylinderMesh_wheel")
-material_override = SubResource("StandardMaterial3D_tire")
-
-[node name="WheelRL" type="MeshInstance3D" parent="."]
-position = Vector3(-1.05, 0.36, -1.45)
-rotation = Vector3(0, 0, 1.5708)
-mesh = SubResource("CylinderMesh_wheel")
-material_override = SubResource("StandardMaterial3D_tire")
-
-[node name="WheelRR" type="MeshInstance3D" parent="."]
-position = Vector3(1.05, 0.36, -1.45)
-rotation = Vector3(0, 0, 1.5708)
-mesh = SubResource("CylinderMesh_wheel")
-material_override = SubResource("StandardMaterial3D_tire")
+[node name="SmallPriceCarModel" parent="ModelPivot" instance=ExtResource("2_model")]
 
 [node name="SeatMarker" type="Marker3D" parent="."]
-position = Vector3(0.48, 0.95, 0.38)
+position = Vector3(0.34, 1.02, 0.3)
 
 [node name="ExitMarker" type="Marker3D" parent="."]
-position = Vector3(1.8, 0.05, 0.45)
+position = Vector3(2.05, 0.05, 0.52)
 rotation = Vector3(0, -1.6, 0)
 
 [node name="RefuelPoint" type="Marker3D" parent="."]
-position = Vector3(0.65, 0.55, 2.0)
+position = Vector3(0.72, 0.6, 1.92)
