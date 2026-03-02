@@ -147,9 +147,9 @@ func _update_intro(delta: float) -> void:
 		camera.position = _camera_base_pos
 
 func _apply_intro_pose(t: float) -> void:
-	var prone_end := 1.8
-	var stand_start := 2.7
-	var stand_end := intro_duration
+	var prone_end: float = 1.8
+	var stand_start: float = 2.7
+	var stand_end: float = intro_duration
 
 	if t <= prone_end:
 		_base_head_pos.y = 0.55
@@ -167,7 +167,7 @@ func _apply_intro_pose(t: float) -> void:
 		camera.position = _camera_base_pos + Vector3(0.03, -0.01, 0.0)
 		return
 
-	var stand_t := clamp((t - stand_start) / max(0.01, stand_end - stand_start), 0.0, 1.0)
+	var stand_t: float = clampf((t - stand_start) / maxf(0.01, stand_end - stand_start), 0.0, 1.0)
 	_base_head_pos.y = lerp(0.68, stand_head_height, stand_t)
 	head.position = Vector3(_base_head_pos.x, _base_head_pos.y, _base_head_pos.z)
 	_pitch = lerp(deg_to_rad(-84.0), 0.0, stand_t)
@@ -180,14 +180,14 @@ func _update_blink_overlay(t: float) -> void:
 	if not is_instance_valid(_blink_overlay):
 		return
 	_blink_overlay.visible = true
-	var alpha := 0.0
-	alpha = max(alpha, _blink_curve(t, 1.95, 0.22))
-	alpha = max(alpha, _blink_curve(t, 2.35, 0.22))
+	var alpha: float = 0.0
+	alpha = maxf(alpha, _blink_curve(t, 1.95, 0.22))
+	alpha = maxf(alpha, _blink_curve(t, 2.35, 0.22))
 	_blink_overlay.color = Color(0.0, 0.0, 0.0, alpha)
 
 func _blink_curve(t: float, center: float, duration: float) -> float:
-	var half := duration * 0.5
-	var d := abs(t - center)
+	var half: float = duration * 0.5
+	var d: float = absf(t - center)
 	if d >= half:
 		return 0.0
 	return 1.0 - (d / half)
