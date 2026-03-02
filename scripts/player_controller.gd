@@ -1,17 +1,20 @@
 extends CharacterBody3D
 
 @export var mouse_sensitivity: float = 0.0018
-@export var walk_speed: float = 4.0
-@export var sprint_speed: float = 7.2
-@export var crouch_speed: float = 2.4
-@export var acceleration: float = 16.0
-@export var deceleration: float = 12.0
+@export var walk_speed: float = 3.7
+@export var sprint_speed: float = 6.1
+@export var crouch_speed: float = 2.0
+@export var acceleration: float = 11.5
+@export var deceleration: float = 8.8
 @export var jump_velocity: float = 5.2
 @export var gravity_scale: float = 1.0
+@export var strafe_speed_multiplier: float = 0.86
+@export var backward_speed_multiplier: float = 0.8
+@export var sprint_acceleration_multiplier: float = 1.18
 
-@export var headbob_frequency: float = 1.8
-@export var headbob_amplitude: float = 0.05
-@export var sprint_headbob_multiplier: float = 1.35
+@export var headbob_frequency: float = 1.5
+@export var headbob_amplitude: float = 0.04
+@export var sprint_headbob_multiplier: float = 1.22
 @export var air_control: float = 0.25
 
 @export var stand_capsule_height: float = 1.2
@@ -24,24 +27,35 @@ extends CharacterBody3D
 @export var sprint_fov: float = 96.0
 @export var crouch_fov: float = 84.0
 @export var fov_lerp_speed: float = 6.0
-@export var camera_tilt_strength: float = 0.03
-@export var camera_sway_strength: float = 0.015
+@export var camera_tilt_strength: float = 0.02
+@export var camera_sway_strength: float = 0.011
 @export var landing_bump_strength: float = 0.08
 @export var landing_recover_speed: float = 10.0
-@export var camera_roll_sway_enabled: bool = false
+@export var camera_roll_sway_enabled: bool = true
 
 @export var injury_default_duration: float = 15.0
 @export var injury_speed_multiplier: float = 0.72
+@export var night_vision_starts_on: bool = true
+@export var night_vision_ir_energy: float = 3.8
+@export var night_vision_ir_range: float = 20.0
+@export var night_vision_ir_angle: float = 52.0
+@export var night_vision_ir_attenuation: float = 0.96
+@export var night_vision_ir_color: Color = Color(0.30, 1.0, 0.36, 1.0)
+@export var night_vision_ir_shadow_enabled: bool = false
 
 @onready var head: Node3D = $Head
 @onready var camera: Camera3D = $Head/Camera3D
 @onready var collision_shape: CollisionShape3D = $CollisionShape3D
+@onready var night_vision_rig: Node3D = $Head/NightVisionRig
+@onready var night_vision_ir_light: SpotLight3D = $Head/NightVisionRig/IRIlluminator
 
 var _gravity: float = float(ProjectSettings.get_setting("physics/3d/default_gravity"))
 var _pitch: float = 0.0
 var _bob_time: float = 0.0
 var _base_head_pos: Vector3
 var _camera_base_pos: Vector3
+var _night_vision_base_pos: Vector3
+var _night_vision_base_rot: Vector3
 var _capsule: CapsuleShape3D
 var _is_crouching: bool = false
 var _landing_offset: float = 0.0
@@ -51,6 +65,12 @@ var _controls_locked: bool = false
 var _injury_time_left: float = 0.0
 var _injury_wobble_time: float = 0.0
 var _has_fuel: bool = false
+var _night_vision_on: bool = true
+
+var _night_vision_overlay_layer: CanvasLayer
+var _night_vision_overlay_rect: ColorRect
+var _night_vision_overlay_material: ShaderMaterial
+var _night_vision_label: Label
 
 func _ready() -> void:
 	_setup_default_input_map()
@@ -59,6 +79,8 @@ func _ready() -> void:
 
 	_base_head_pos = head.position
 	_camera_base_pos = camera.position
+	_night_vision_base_pos = night_vision_rig.position
+	_night_vision_base_rot = night_vision_rig.rotation
 	_capsule = collision_shape.shape as CapsuleShape3D
 	if _capsule:
 		stand_capsule_height = _capsule.height
@@ -67,6 +89,10 @@ func _ready() -> void:
 	head.rotation = Vector3.ZERO
 	camera.rotation = Vector3.ZERO
 	camera.position = _camera_base_pos
+	_build_night_vision_overlay()
+	_night_vision_on = night_vision_starts_on
+	_apply_night_vision_settings()
+	_set_night_vision_enabled(_night_vision_on)
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_cancel"):
@@ -74,6 +100,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if event.is_action_pressed("click_capture"):
 		Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+		return
+	if event.is_action_pressed("toggle_night_vision"):
+		_set_night_vision_enabled(not _night_vision_on)
 		return
 
 	if _controls_locked:
@@ -99,6 +128,7 @@ func _physics_process(delta: float) -> void:
 		_bob_time = lerpf(_bob_time, 0.0, minf(1.0, delta * 8.0))
 		_landing_offset = lerpf(_landing_offset, 0.0, minf(1.0, delta * landing_recover_speed))
 		camera.fov = lerpf(camera.fov, walk_fov, minf(1.0, delta * fov_lerp_speed))
+		_update_night_vision_motion(delta)
 		return
 
 	var was_on_floor: bool = is_on_floor()
@@ -116,6 +146,13 @@ func _physics_process(delta: float) -> void:
 	elif Input.is_action_pressed("move_sprint"):
 		speed = sprint_speed
 
+	var locomotion_scale: float = 1.0
+	if input_dir.y > 0.08:
+		locomotion_scale *= backward_speed_multiplier
+	if absf(input_dir.x) > 0.08 and input_dir.y > -0.2:
+		locomotion_scale *= strafe_speed_multiplier
+	speed *= locomotion_scale
+
 	if _is_injured_phase():
 		var limp_pulse: float = maxf(0.0, sin(_injury_wobble_time * 8.0))
 		var limp_factor: float = injury_speed_multiplier * (0.92 - limp_pulse * 0.22)
@@ -126,6 +163,8 @@ func _physics_process(delta: float) -> void:
 	var target_velocity: Vector3 = wish_dir * speed
 	var control: float = 1.0 if is_on_floor() else air_control
 	var accel: float = acceleration if wish_dir.length() > 0.0 else deceleration
+	if Input.is_action_pressed("move_sprint") and input_dir.y < -0.08 and wish_dir.length() > 0.0:
+		accel *= sprint_acceleration_multiplier
 
 	velocity.x = move_toward(velocity.x, target_velocity.x, accel * control * delta)
 	velocity.z = move_toward(velocity.z, target_velocity.z, accel * control * delta)
@@ -142,6 +181,7 @@ func _physics_process(delta: float) -> void:
 
 	_apply_headbob(delta)
 	_update_camera_effects(delta, input_dir)
+	_update_night_vision_motion(delta)
 
 func lock_controls(locked: bool) -> void:
 	_controls_locked = locked
@@ -181,6 +221,87 @@ func reset_head_camera_pose() -> void:
 	head.rotation = Vector3.ZERO
 	camera.rotation = Vector3.ZERO
 	camera.position = _camera_base_pos
+
+func set_first_person_active(active: bool) -> void:
+	camera.current = active
+
+func _set_night_vision_enabled(enabled: bool) -> void:
+	_night_vision_on = enabled
+	if night_vision_ir_light != null:
+		night_vision_ir_light.visible = enabled
+		night_vision_ir_light.light_energy = night_vision_ir_energy if enabled else 0.0
+
+	if is_instance_valid(_night_vision_overlay_rect):
+		_night_vision_overlay_rect.visible = enabled
+	if is_instance_valid(_night_vision_label):
+		_night_vision_label.visible = enabled
+	if _night_vision_overlay_material != null:
+		_night_vision_overlay_material.set_shader_parameter("overlay_alpha", 0.9 if enabled else 0.0)
+
+func _apply_night_vision_settings() -> void:
+	if night_vision_ir_light == null:
+		return
+	night_vision_ir_light.light_color = night_vision_ir_color
+	night_vision_ir_light.spot_range = night_vision_ir_range
+	night_vision_ir_light.spot_angle = night_vision_ir_angle
+	night_vision_ir_light.spot_attenuation = night_vision_ir_attenuation
+	night_vision_ir_light.shadow_enabled = night_vision_ir_shadow_enabled
+	night_vision_ir_light.shadow_bias = 0.05
+	night_vision_ir_light.shadow_normal_bias = 1.0
+
+func _update_night_vision_motion(delta: float) -> void:
+	if night_vision_rig == null:
+		return
+
+	var injury_shake: float = sin(_injury_wobble_time * 6.3) * (0.016 if _is_injured_phase() else 0.0)
+	var bob_x: float = cos(_bob_time * 0.55) * 0.008
+	var bob_y: float = sin(_bob_time * 1.05) * 0.012
+	var sway_x: float = _mouse_sway.x * 2.2
+	var sway_y: float = -_mouse_sway.y * 2.2
+
+	var target_pos: Vector3 = _night_vision_base_pos + Vector3(bob_x + injury_shake, bob_y - absf(injury_shake) * 0.25, 0.0)
+	var target_rot: Vector3 = _night_vision_base_rot + Vector3(sway_y * 2.1, -sway_x * 1.35, -sway_x * 0.65)
+
+	night_vision_rig.position = night_vision_rig.position.lerp(target_pos, minf(1.0, delta * 10.0))
+	night_vision_rig.rotation = night_vision_rig.rotation.lerp(target_rot, minf(1.0, delta * 8.0))
+
+func _build_night_vision_overlay() -> void:
+	var overlay_shader: Shader = load("res://shaders/night_vision_overlay.gdshader") as Shader
+	if overlay_shader == null:
+		return
+
+	_night_vision_overlay_layer = CanvasLayer.new()
+	_night_vision_overlay_layer.layer = 60
+	add_child(_night_vision_overlay_layer)
+
+	_night_vision_overlay_rect = ColorRect.new()
+	_night_vision_overlay_rect.anchor_left = 0.0
+	_night_vision_overlay_rect.anchor_top = 0.0
+	_night_vision_overlay_rect.anchor_right = 1.0
+	_night_vision_overlay_rect.anchor_bottom = 1.0
+	_night_vision_overlay_rect.offset_left = 0.0
+	_night_vision_overlay_rect.offset_top = 0.0
+	_night_vision_overlay_rect.offset_right = 0.0
+	_night_vision_overlay_rect.offset_bottom = 0.0
+	_night_vision_overlay_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_night_vision_overlay_rect.color = Color(1.0, 1.0, 1.0, 1.0)
+	_night_vision_overlay_layer.add_child(_night_vision_overlay_rect)
+
+	_night_vision_overlay_material = ShaderMaterial.new()
+	_night_vision_overlay_material.shader = overlay_shader
+	_night_vision_overlay_material.set_shader_parameter("overlay_alpha", 0.9)
+	_night_vision_overlay_material.set_shader_parameter("gain", 2.25)
+	_night_vision_overlay_material.set_shader_parameter("grain_strength", 0.07)
+	_night_vision_overlay_material.set_shader_parameter("scanline_strength", 0.09)
+	_night_vision_overlay_material.set_shader_parameter("vignette_strength", 0.36)
+	_night_vision_overlay_rect.material = _night_vision_overlay_material
+
+	_night_vision_label = Label.new()
+	_night_vision_label.text = "NV CAM"
+	_night_vision_label.position = Vector2(18.0, 14.0)
+	_night_vision_label.add_theme_color_override("font_color", Color(0.56, 1.0, 0.62, 0.95))
+	_night_vision_label.add_theme_font_size_override("font_size", 15)
+	_night_vision_overlay_layer.add_child(_night_vision_label)
 
 func _is_injured_phase() -> bool:
 	return _injury_time_left > 0.0
@@ -260,6 +381,8 @@ func _setup_default_input_map() -> void:
 	_add_action_if_missing("move_sprint", KEY_SHIFT)
 	_add_action_if_missing("move_crouch", KEY_CTRL)
 	_add_action_if_missing("interact", KEY_E)
+	_add_action_if_missing("toggle_door", KEY_P)
+	_add_action_if_missing("toggle_night_vision", KEY_F)
 	_add_action_if_missing("click_capture", MOUSE_BUTTON_LEFT, true)
 
 func _add_action_if_missing(action: StringName, keycode: int, is_mouse: bool = false) -> void:

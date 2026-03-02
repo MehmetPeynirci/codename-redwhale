@@ -1,18 +1,22 @@
 extends Node3D
 
-@export var grave_count: int = 34
+@export var grave_count: int = 14
 @export var village_radius: float = 90.0
 @export var tree_count: int = 78
 @export var grass_count: int = 2200
 @export var rock_count: int = 120
+@export var cemetery_center: Vector3 = Vector3(-30.0, 0.0, 10.0)
+@export var cemetery_half_extents: Vector2 = Vector2(4.0, 6.5)
 
 var _wall_mat: ShaderMaterial
 var _roof_mat: ShaderMaterial
 var _wood_mat: ShaderMaterial
+var _door_mat: ShaderMaterial
 var _grave_mat: ShaderMaterial
 var _ground_shader_mat: ShaderMaterial
 var _glass_shader_mat: ShaderMaterial
 var _foliage_mat: ShaderMaterial
+var _door_script: Script
 
 var _tree_trunk_mat: StandardMaterial3D
 var _tree_leaf_mat: StandardMaterial3D
@@ -67,6 +71,18 @@ func _build_materials() -> void:
 		0.33
 	)
 
+	_door_mat = _create_weathered_mat(
+		weather_shader,
+		Color(0.12, 0.09, 0.07),
+		Color(0.13, 0.16, 0.12),
+		Color(0.06, 0.06, 0.05),
+		0.46,
+		18.0,
+		0.22,
+		0.74,
+		0.34
+	)
+
 	_grave_mat = _create_weathered_mat(
 		weather_shader,
 		Color(0.37, 0.37, 0.38),
@@ -103,6 +119,8 @@ func _build_materials() -> void:
 	_rock_mat = StandardMaterial3D.new()
 	_rock_mat.albedo_color = Color(0.28, 0.29, 0.30)
 	_rock_mat.roughness = 0.95
+
+	_door_script = load("res://scripts/interactable_door.gd") as Script
 
 func _create_weathered_mat(
 	shader: Shader,
@@ -177,30 +195,78 @@ func _create_ruined_house(origin: Vector3, y_rot: float) -> void:
 
 	_add_box_segment(house, Vector3(2.1, h, t), Vector3(-1.95, h * 0.5, 3.0), Vector3.ZERO, _wall_mat, true)
 	_add_box_segment(house, Vector3(2.1, h, t), Vector3(1.95, h * 0.5, 3.0), Vector3.ZERO, _wall_mat, true)
-	_add_box_segment(house, Vector3(1.8, 0.7, t), Vector3(0.0, 0.35, 3.0), Vector3.ZERO, _wall_mat, true)
-	_add_box_segment(house, Vector3(1.8, 1.0, t), Vector3(0.0, 2.3, 3.0), Vector3.ZERO, _wall_mat, true)
+	_add_box_segment(house, Vector3(1.8, 0.4, t), Vector3(0.0, 2.6, 3.0), Vector3.ZERO, _wall_mat, true)
 
 	_add_box_segment(house, Vector3(4.8, 0.15, 2.1), Vector3(-0.8, 2.9, -1.1), Vector3(0.16, 0.25, -0.1), _roof_mat, true)
 	_add_box_segment(house, Vector3(2.5, 0.15, 1.5), Vector3(1.5, 2.5, 1.0), Vector3(-0.1, -0.2, 0.1), _roof_mat, true)
 
-	var window_glass: MeshInstance3D = MeshInstance3D.new()
-	var glass: QuadMesh = QuadMesh.new()
-	glass.size = Vector2(1.2, 1.1)
-	window_glass.mesh = glass
-	window_glass.material_override = _glass_shader_mat
-	window_glass.position = Vector3(0.0, 1.25, 2.88)
-	window_glass.rotation = Vector3(0.0, PI, 0.0)
-	house.add_child(window_glass)
+	_add_box_segment(house, Vector3(1.56, 0.12, 0.12), Vector3(0.0, 2.36, 2.94), Vector3.ZERO, _wood_mat, false)
+	_add_box_segment(house, Vector3(1.56, 0.06, 0.12), Vector3(0.0, 0.23, 2.94), Vector3.ZERO, _wood_mat, false)
+	_add_box_segment(house, Vector3(0.12, 2.2, 0.12), Vector3(-0.84, 1.3, 2.94), Vector3.ZERO, _wood_mat, false)
+	_add_box_segment(house, Vector3(0.12, 2.2, 0.12), Vector3(0.84, 1.3, 2.94), Vector3.ZERO, _wood_mat, false)
 
-	_add_box_segment(house, Vector3(1.3, 0.12, 0.12), Vector3(0.0, 1.86, 2.94), Vector3.ZERO, _wood_mat, false)
-	_add_box_segment(house, Vector3(1.3, 0.12, 0.12), Vector3(0.0, 0.72, 2.94), Vector3.ZERO, _wood_mat, false)
-	_add_box_segment(house, Vector3(0.12, 1.28, 0.12), Vector3(-0.64, 1.28, 2.94), Vector3.ZERO, _wood_mat, false)
-	_add_box_segment(house, Vector3(0.12, 1.28, 0.12), Vector3(0.64, 1.28, 2.94), Vector3.ZERO, _wood_mat, false)
+	_add_house_door(house)
+
+func _add_house_door(house: Node3D) -> void:
+	var hinge: Node3D = Node3D.new()
+	hinge.name = "DoorHinge"
+	hinge.position = Vector3(-0.76, 0.24, 2.89)
+	if _door_script != null:
+		hinge.set_script(_door_script)
+		hinge.set("interaction_distance", 2.45)
+		hinge.set("open_angle_deg", 103.0)
+		hinge.set("open_duration", 0.21)
+		hinge.set("open_direction", -1.0)
+		hinge.set("require_facing_door", true)
+		hinge.set("facing_dot_threshold", -0.1)
+	house.add_child(hinge)
+
+	var door_body: AnimatableBody3D = AnimatableBody3D.new()
+	door_body.name = "DoorBody"
+	hinge.add_child(door_body)
+
+	var door_mesh: MeshInstance3D = MeshInstance3D.new()
+	var door_shape: BoxMesh = BoxMesh.new()
+	door_shape.size = Vector3(1.48, 2.12, 0.08)
+	door_mesh.mesh = door_shape
+	door_mesh.material_override = _door_mat
+	door_mesh.position = Vector3(0.74, 1.06, 0.0)
+	door_body.add_child(door_mesh)
+
+	var collision: CollisionShape3D = CollisionShape3D.new()
+	var box: BoxShape3D = BoxShape3D.new()
+	box.size = Vector3(1.5, 2.14, 0.1)
+	collision.shape = box
+	collision.position = door_mesh.position
+	door_body.add_child(collision)
+
+	var handle_pivot: Node3D = Node3D.new()
+	handle_pivot.name = "HandlePivot"
+	handle_pivot.position = Vector3(1.20, 1.04, 0.055)
+	door_body.add_child(handle_pivot)
+
+	var handle_base: MeshInstance3D = MeshInstance3D.new()
+	var base_mesh: CylinderMesh = CylinderMesh.new()
+	base_mesh.top_radius = 0.022
+	base_mesh.bottom_radius = 0.022
+	base_mesh.height = 0.05
+	handle_base.mesh = base_mesh
+	handle_base.material_override = _wood_mat
+	handle_base.rotation_degrees = Vector3(90.0, 0.0, 0.0)
+	handle_pivot.add_child(handle_base)
+
+	var handle_bar: MeshInstance3D = MeshInstance3D.new()
+	var bar_mesh: BoxMesh = BoxMesh.new()
+	bar_mesh.size = Vector3(0.22, 0.028, 0.028)
+	handle_bar.mesh = bar_mesh
+	handle_bar.material_override = _wood_mat
+	handle_bar.position = Vector3(0.11, 0.0, 0.01)
+	handle_pivot.add_child(handle_bar)
 
 func _create_graves() -> void:
 	var grave_root: Node3D = Node3D.new()
 	grave_root.name = "Graves"
-	grave_root.position = Vector3(-30.0, 0.0, 10.0)
+	grave_root.position = cemetery_center
 	add_child(grave_root)
 
 	var grave_mesh: BoxMesh = BoxMesh.new()
@@ -212,7 +278,11 @@ func _create_graves() -> void:
 	mm.mesh = grave_mesh
 
 	for i in range(grave_count):
-		var local_pos: Vector3 = Vector3(randf_range(-6.5, 6.5), 0.52, randf_range(-9.5, 9.5))
+		var local_pos: Vector3 = Vector3(
+			randf_range(-cemetery_half_extents.x, cemetery_half_extents.x),
+			0.52,
+			randf_range(-cemetery_half_extents.y, cemetery_half_extents.y)
+		)
 		var basis: Basis = Basis.from_euler(Vector3(0.0, randf_range(-0.35, 0.35), randf_range(-0.05, 0.08)))
 		var xform: Transform3D = Transform3D(basis, local_pos)
 		xform = xform.scaled_local(Vector3(randf_range(0.9, 1.2), randf_range(0.75, 1.35), 1.0))
