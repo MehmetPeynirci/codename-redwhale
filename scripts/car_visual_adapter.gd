@@ -1,27 +1,65 @@
 extends Node3D
 
 @export var model_root_path: NodePath = NodePath("ModelPivot")
+@export var fallback_visual_path: NodePath = NodePath("FallbackVisual")
 @export var collision_shape_path: NodePath = NodePath("CarBody/CollisionShape3D")
+@export var model_scene_candidates: PackedStringArray = PackedStringArray([
+	"res://small-price-car/source/NEXIA DONE.glb",
+	"res://small-price-car/source/NEXIA DONE.gltf",
+	"res://small-price-car/source/NEXIA DONE.fbx"
+])
 @export var target_length: float = 4.6
 @export var target_width: float = 1.95
 @export var y_rotation_offset_deg: float = 0.0
 
 var _model_root: Node3D
+var _fallback_visual: Node3D
 var _collision_shape: CollisionShape3D
+var _active_model: Node3D
 
 func _ready() -> void:
 	_model_root = get_node_or_null(model_root_path) as Node3D
+	_fallback_visual = get_node_or_null(fallback_visual_path) as Node3D
 	_collision_shape = get_node_or_null(collision_shape_path) as CollisionShape3D
 	if _model_root == null:
 		return
 
 	_model_root.rotation_degrees.y = y_rotation_offset_deg
-	_fit_model_to_target()
-	_update_collision_shape()
-	_apply_texture_materials()
+	_active_model = _try_spawn_external_model()
+
+	if _active_model != null:
+		if _fallback_visual != null:
+			_fallback_visual.visible = false
+		_fit_model_to_target()
+		_update_collision_shape()
+		_apply_texture_materials()
+	else:
+		if _fallback_visual != null:
+			_fallback_visual.visible = true
+		_update_collision_shape()
+
+func _try_spawn_external_model() -> Node3D:
+	for path_variant in model_scene_candidates:
+		var path: String = str(path_variant)
+		if not ResourceLoader.exists(path, "PackedScene"):
+			continue
+		var packed: PackedScene = load(path) as PackedScene
+		if packed == null:
+			continue
+		var inst: Node = packed.instantiate()
+		var inst3d: Node3D = inst as Node3D
+		if inst3d == null:
+			inst.queue_free()
+			continue
+		_model_root.add_child(inst3d)
+		return inst3d
+	return null
 
 func _fit_model_to_target() -> void:
-	var meshes: Array[MeshInstance3D] = _collect_meshes(_model_root)
+	if _active_model == null:
+		return
+
+	var meshes: Array[MeshInstance3D] = _collect_meshes(_active_model)
 	var bounds: AABB = _compute_bounds(meshes)
 	if bounds.size.length() <= 0.0001:
 		return
@@ -31,13 +69,13 @@ func _fit_model_to_target() -> void:
 		return
 
 	var uniform_scale: float = target_length / horizontal_span
-	_model_root.scale = Vector3.ONE * uniform_scale
+	_active_model.scale = Vector3.ONE * uniform_scale
 
-	var scaled_bounds: AABB = _compute_bounds(meshes)
+	var scaled_bounds: AABB = _compute_bounds(_collect_meshes(_active_model))
 	var center_x: float = scaled_bounds.position.x + scaled_bounds.size.x * 0.5
 	var center_z: float = scaled_bounds.position.z + scaled_bounds.size.z * 0.5
 	var bottom_y: float = scaled_bounds.position.y
-	_model_root.position -= Vector3(center_x, bottom_y, center_z)
+	_active_model.position -= Vector3(center_x, bottom_y, center_z)
 
 func _update_collision_shape() -> void:
 	if _collision_shape == null:
@@ -50,12 +88,15 @@ func _update_collision_shape() -> void:
 	_collision_shape.position = Vector3(0.0, box.size.y * 0.5, 0.0)
 
 func _apply_texture_materials() -> void:
+	if _active_model == null:
+		return
+
 	var mats: Dictionary = _build_material_map()
 	var default_mat: Material = mats.get("defaultmaterial", null)
 	if default_mat == null:
 		return
 
-	var meshes: Array[MeshInstance3D] = _collect_meshes(_model_root)
+	var meshes: Array[MeshInstance3D] = _collect_meshes(_active_model)
 	for mesh_instance in meshes:
 		var key: String = _choose_material_key(mesh_instance.name.to_lower())
 		var chosen: Material = mats.get(key, default_mat)
@@ -181,10 +222,13 @@ func _collect_meshes_rec(node: Node, bucket: Array[MeshInstance3D]) -> void:
 			_collect_meshes_rec(child, bucket)
 
 func _compute_bounds(meshes: Array[MeshInstance3D]) -> AABB:
+	if _active_model == null:
+		return AABB(Vector3.ZERO, Vector3.ZERO)
+
 	var has_point: bool = false
 	var min_v: Vector3 = Vector3.ZERO
 	var max_v: Vector3 = Vector3.ZERO
-	var inv: Transform3D = _model_root.global_transform.affine_inverse()
+	var inv: Transform3D = _active_model.global_transform.affine_inverse()
 
 	for mesh_instance in meshes:
 		if mesh_instance.mesh == null:
