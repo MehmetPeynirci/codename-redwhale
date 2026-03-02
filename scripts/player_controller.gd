@@ -42,6 +42,7 @@ extends CharacterBody3D
 @export var night_vision_ir_attenuation: float = 0.96
 @export var night_vision_ir_color: Color = Color(0.30, 1.0, 0.36, 1.0)
 @export var night_vision_ir_shadow_enabled: bool = false
+@export var night_vision_unlock_prompt_duration: float = 5.0
 @export var prompt_scan_interval: float = 0.09
 
 @onready var head: Node3D = $Head
@@ -250,7 +251,7 @@ func set_first_person_active(active: bool) -> void:
 func unlock_night_vision_controls(show_hint: bool = true) -> void:
 	_night_vision_unlocked = true
 	if show_hint:
-		_show_night_vision_prompt(9.0)
+		_show_night_vision_prompt(night_vision_unlock_prompt_duration)
 
 func _set_night_vision_enabled(enabled: bool) -> void:
 	if enabled and not _night_vision_unlocked:
