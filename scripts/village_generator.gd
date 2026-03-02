@@ -184,7 +184,7 @@ func _create_ruined_house(origin: Vector3, y_rot: float) -> void:
 	house.rotation.y = y_rot
 	add_child(house)
 
-	_add_box_segment(house, Vector3(6.0, 0.04, 6.0), Vector3(0.0, 0.02, 0.0), Vector3.ZERO, _wall_mat, true)
+	_add_box_segment(house, Vector3(6.0, 0.04, 6.0), Vector3(0.0, 0.02, 0.0), Vector3.ZERO, _wall_mat, false)
 
 	var h: float = 2.8
 	var t: float = 0.22
@@ -219,7 +219,6 @@ func _add_house_door(house: Node3D) -> void:
 		hinge.set("open_direction", -1.0)
 		hinge.set("require_facing_door", true)
 		hinge.set("facing_dot_threshold", -0.1)
-	house.add_child(hinge)
 
 	var door_body: AnimatableBody3D = AnimatableBody3D.new()
 	door_body.name = "DoorBody"
@@ -262,6 +261,8 @@ func _add_house_door(house: Node3D) -> void:
 	handle_bar.material_override = _wood_mat
 	handle_bar.position = Vector3(0.11, 0.0, 0.01)
 	handle_pivot.add_child(handle_bar)
+
+	house.add_child(hinge)
 
 func _create_graves() -> void:
 	var grave_root: Node3D = Node3D.new()

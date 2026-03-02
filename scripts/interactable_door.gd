@@ -32,8 +32,7 @@ func _ready() -> void:
 	_closed_y = rotation.y
 	_open_y = _closed_y + deg_to_rad(open_angle_deg) * open_direction
 	_player = _find_player()
-	_handle_pivot = get_node_or_null(handle_path) as Node3D
-	_door_collision_shape = get_node_or_null("DoorBody/CollisionShape3D") as CollisionShape3D
+	_cache_nodes()
 	if _handle_pivot != null:
 		_handle_rest_rotation = _handle_pivot.rotation
 	_set_door_collision_enabled(true)
@@ -87,18 +86,18 @@ func _is_nearest_door() -> bool:
 	return nearest == self
 
 func _toggle() -> void:
+	_cache_nodes()
 	if not _is_open:
 		_set_door_collision_enabled(false)
-	else:
-		_set_door_collision_enabled(true)
 
 	_is_open = not _is_open
 	var target_y: float = _open_y if _is_open else _closed_y
+	var enable_collision_on_finish: bool = not _is_open
 	_play_squeak()
 	_animate_handle()
-	_animate_rotation(target_y)
+	_animate_rotation(target_y, enable_collision_on_finish)
 
-func _animate_rotation(target_y: float) -> void:
+func _animate_rotation(target_y: float, enable_collision_on_finish: bool) -> void:
 	if _anim_tween != null and _anim_tween.is_running():
 		_anim_tween.kill()
 
@@ -106,6 +105,8 @@ func _animate_rotation(target_y: float) -> void:
 	_anim_tween.set_trans(Tween.TRANS_SINE)
 	_anim_tween.set_ease(Tween.EASE_IN_OUT)
 	_anim_tween.tween_property(self, "rotation:y", target_y, open_duration)
+	if enable_collision_on_finish:
+		_anim_tween.tween_callback(_set_door_collision_enabled.bind(true))
 
 func _animate_handle() -> void:
 	if _handle_pivot == null:
@@ -183,6 +184,7 @@ func _play_squeak() -> void:
 	_squeak_player.play()
 
 func _set_door_collision_enabled(enabled: bool) -> void:
+	_cache_nodes()
 	if _door_collision_shape != null:
 		_door_collision_shape.disabled = not enabled
 
@@ -201,3 +203,9 @@ func can_player_interact(player_node: Node3D) -> bool:
 	var to_door: Vector3 = (global_position - player_pos).normalized()
 	var player_forward: Vector3 = -player_node.global_transform.basis.z.normalized()
 	return player_forward.dot(to_door) >= facing_dot_threshold
+
+func _cache_nodes() -> void:
+	if _handle_pivot == null:
+		_handle_pivot = get_node_or_null(handle_path) as Node3D
+	if _door_collision_shape == null:
+		_door_collision_shape = get_node_or_null("DoorBody/CollisionShape3D") as CollisionShape3D
