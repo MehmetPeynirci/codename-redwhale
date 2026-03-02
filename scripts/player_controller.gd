@@ -35,13 +35,14 @@ extends CharacterBody3D
 
 @export var injury_default_duration: float = 15.0
 @export var injury_speed_multiplier: float = 0.72
-@export var night_vision_starts_on: bool = true
+@export var night_vision_starts_on: bool = false
 @export var night_vision_ir_energy: float = 3.8
 @export var night_vision_ir_range: float = 20.0
 @export var night_vision_ir_angle: float = 52.0
 @export var night_vision_ir_attenuation: float = 0.96
 @export var night_vision_ir_color: Color = Color(0.30, 1.0, 0.36, 1.0)
 @export var night_vision_ir_shadow_enabled: bool = false
+@export var prompt_scan_interval: float = 0.09
 
 @onready var head: Node3D = $Head
 @onready var camera: Camera3D = $Head/Camera3D
@@ -66,11 +67,21 @@ var _injury_time_left: float = 0.0
 var _injury_wobble_time: float = 0.0
 var _has_fuel: bool = false
 var _night_vision_on: bool = true
+var _night_vision_unlocked: bool = false
 
 var _night_vision_overlay_layer: CanvasLayer
 var _night_vision_overlay_rect: ColorRect
 var _night_vision_overlay_material: ShaderMaterial
 var _night_vision_label: Label
+
+var _prompt_layer: CanvasLayer
+var _door_prompt_bg: ColorRect
+var _door_prompt_label: Label
+var _night_vision_prompt_bg: ColorRect
+var _night_vision_prompt_label: Label
+var _door_prompt_scan_left: float = 0.0
+var _nearby_door: Node3D
+var _night_vision_prompt_time_left: float = 0.0
 
 func _ready() -> void:
 	_setup_default_input_map()
@@ -90,8 +101,13 @@ func _ready() -> void:
 	camera.rotation = Vector3.ZERO
 	camera.position = _camera_base_pos
 	_build_night_vision_overlay()
-	_night_vision_on = night_vision_starts_on
+	_build_prompt_overlay()
 	_apply_night_vision_settings()
+	_night_vision_on = false
+	_night_vision_unlocked = false
+	if night_vision_starts_on:
+		_night_vision_unlocked = true
+		_night_vision_on = true
 	_set_night_vision_enabled(_night_vision_on)
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -102,7 +118,11 @@ func _unhandled_input(event: InputEvent) -> void:
 		Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 		return
 	if event.is_action_pressed("toggle_night_vision"):
+		if not _night_vision_unlocked:
+			_show_night_vision_prompt(2.2)
+			return
 		_set_night_vision_enabled(not _night_vision_on)
+		_night_vision_prompt_time_left = 0.0
 		return
 
 	if _controls_locked:
@@ -129,6 +149,7 @@ func _physics_process(delta: float) -> void:
 		_landing_offset = lerpf(_landing_offset, 0.0, minf(1.0, delta * landing_recover_speed))
 		camera.fov = lerpf(camera.fov, walk_fov, minf(1.0, delta * fov_lerp_speed))
 		_update_night_vision_motion(delta)
+		_update_prompt_state(delta)
 		return
 
 	var was_on_floor: bool = is_on_floor()
@@ -182,6 +203,7 @@ func _physics_process(delta: float) -> void:
 	_apply_headbob(delta)
 	_update_camera_effects(delta, input_dir)
 	_update_night_vision_motion(delta)
+	_update_prompt_state(delta)
 
 func lock_controls(locked: bool) -> void:
 	_controls_locked = locked
@@ -225,7 +247,14 @@ func reset_head_camera_pose() -> void:
 func set_first_person_active(active: bool) -> void:
 	camera.current = active
 
+func unlock_night_vision_controls(show_hint: bool = true) -> void:
+	_night_vision_unlocked = true
+	if show_hint:
+		_show_night_vision_prompt(9.0)
+
 func _set_night_vision_enabled(enabled: bool) -> void:
+	if enabled and not _night_vision_unlocked:
+		enabled = false
 	_night_vision_on = enabled
 	if night_vision_ir_light != null:
 		night_vision_ir_light.visible = enabled
@@ -302,6 +331,130 @@ func _build_night_vision_overlay() -> void:
 	_night_vision_label.add_theme_color_override("font_color", Color(0.56, 1.0, 0.62, 0.95))
 	_night_vision_label.add_theme_font_size_override("font_size", 15)
 	_night_vision_overlay_layer.add_child(_night_vision_label)
+
+func _build_prompt_overlay() -> void:
+	_prompt_layer = CanvasLayer.new()
+	_prompt_layer.layer = 61
+	add_child(_prompt_layer)
+
+	_door_prompt_bg = ColorRect.new()
+	_door_prompt_bg.anchor_left = 0.5
+	_door_prompt_bg.anchor_top = 1.0
+	_door_prompt_bg.anchor_right = 0.5
+	_door_prompt_bg.anchor_bottom = 1.0
+	_door_prompt_bg.offset_left = -200.0
+	_door_prompt_bg.offset_top = -88.0
+	_door_prompt_bg.offset_right = 200.0
+	_door_prompt_bg.offset_bottom = -46.0
+	_door_prompt_bg.color = Color(0.02, 0.03, 0.04, 0.74)
+	_door_prompt_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_door_prompt_bg.visible = false
+	_prompt_layer.add_child(_door_prompt_bg)
+
+	_door_prompt_label = Label.new()
+	_door_prompt_label.anchor_left = 0.0
+	_door_prompt_label.anchor_top = 0.0
+	_door_prompt_label.anchor_right = 1.0
+	_door_prompt_label.anchor_bottom = 1.0
+	_door_prompt_label.offset_left = 14.0
+	_door_prompt_label.offset_top = 8.0
+	_door_prompt_label.offset_right = -14.0
+	_door_prompt_label.offset_bottom = -8.0
+	_door_prompt_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_door_prompt_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_door_prompt_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_door_prompt_label.add_theme_font_size_override("font_size", 18)
+	_door_prompt_label.add_theme_color_override("font_color", Color(0.93, 0.95, 0.97, 1.0))
+	_door_prompt_bg.add_child(_door_prompt_label)
+
+	_night_vision_prompt_bg = ColorRect.new()
+	_night_vision_prompt_bg.anchor_left = 1.0
+	_night_vision_prompt_bg.anchor_top = 0.0
+	_night_vision_prompt_bg.anchor_right = 1.0
+	_night_vision_prompt_bg.anchor_bottom = 0.0
+	_night_vision_prompt_bg.offset_left = -380.0
+	_night_vision_prompt_bg.offset_top = 26.0
+	_night_vision_prompt_bg.offset_right = -20.0
+	_night_vision_prompt_bg.offset_bottom = 64.0
+	_night_vision_prompt_bg.color = Color(0.02, 0.03, 0.04, 0.74)
+	_night_vision_prompt_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_night_vision_prompt_bg.visible = false
+	_prompt_layer.add_child(_night_vision_prompt_bg)
+
+	_night_vision_prompt_label = Label.new()
+	_night_vision_prompt_label.anchor_left = 0.0
+	_night_vision_prompt_label.anchor_top = 0.0
+	_night_vision_prompt_label.anchor_right = 1.0
+	_night_vision_prompt_label.anchor_bottom = 1.0
+	_night_vision_prompt_label.offset_left = 12.0
+	_night_vision_prompt_label.offset_top = 7.0
+	_night_vision_prompt_label.offset_right = -12.0
+	_night_vision_prompt_label.offset_bottom = -7.0
+	_night_vision_prompt_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_night_vision_prompt_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_night_vision_prompt_label.add_theme_font_size_override("font_size", 16)
+	_night_vision_prompt_label.add_theme_color_override("font_color", Color(0.82, 0.97, 0.86, 0.96))
+	_night_vision_prompt_bg.add_child(_night_vision_prompt_label)
+
+func _update_prompt_state(delta: float) -> void:
+	if _night_vision_prompt_time_left > 0.0:
+		_night_vision_prompt_time_left = maxf(0.0, _night_vision_prompt_time_left - delta)
+
+	_door_prompt_scan_left -= delta
+	if _door_prompt_scan_left <= 0.0:
+		_door_prompt_scan_left = prompt_scan_interval
+		_nearby_door = _find_nearby_door()
+
+	_update_door_prompt()
+	_update_night_vision_prompt()
+
+func _show_night_vision_prompt(duration_seconds: float) -> void:
+	_night_vision_prompt_time_left = maxf(_night_vision_prompt_time_left, duration_seconds)
+
+func _update_door_prompt() -> void:
+	if _door_prompt_bg == null or _door_prompt_label == null:
+		return
+	if _nearby_door == null:
+		_door_prompt_bg.visible = false
+		return
+	if not _nearby_door.has_method("is_open"):
+		_door_prompt_bg.visible = false
+		return
+
+	var door_is_open: bool = bool(_nearby_door.call("is_open"))
+	var open_text: String = "Kapiyi kapatmak icin P'ye basin" if door_is_open else "Kapiyi acmak icin P'ye basin"
+	_door_prompt_label.text = open_text
+	_door_prompt_bg.visible = true
+
+func _update_night_vision_prompt() -> void:
+	if _night_vision_prompt_bg == null or _night_vision_prompt_label == null:
+		return
+	var should_show: bool = _night_vision_unlocked and not _night_vision_on and _night_vision_prompt_time_left > 0.0
+	_night_vision_prompt_bg.visible = should_show
+	if should_show:
+		_night_vision_prompt_label.text = "Gece gorusu acmak icin F'ye basin"
+
+func _find_nearby_door() -> Node3D:
+	var nearest: Node3D = null
+	var nearest_dist_sq: float = INF
+	var door_nodes: Array[Node] = get_tree().get_nodes_in_group("interactable_door")
+
+	for i in range(door_nodes.size()):
+		var door: Node3D = door_nodes[i] as Node3D
+		if door == null:
+			continue
+		if not door.has_method("can_player_interact"):
+			continue
+		var can_interact: bool = bool(door.call("can_player_interact", self))
+		if not can_interact:
+			continue
+
+		var dist_sq: float = global_position.distance_squared_to(door.global_position)
+		if dist_sq < nearest_dist_sq:
+			nearest_dist_sq = dist_sq
+			nearest = door
+
+	return nearest
 
 func _is_injured_phase() -> bool:
 	return _injury_time_left > 0.0

@@ -184,7 +184,7 @@ func _create_ruined_house(origin: Vector3, y_rot: float) -> void:
 	house.rotation.y = y_rot
 	add_child(house)
 
-	_add_box_segment(house, Vector3(6.0, 0.2, 6.0), Vector3(0.0, 0.1, 0.0), Vector3.ZERO, _wall_mat, true)
+	_add_box_segment(house, Vector3(6.0, 0.04, 6.0), Vector3(0.0, 0.02, 0.0), Vector3.ZERO, _wall_mat, true)
 
 	var h: float = 2.8
 	var t: float = 0.22
@@ -201,7 +201,7 @@ func _create_ruined_house(origin: Vector3, y_rot: float) -> void:
 	_add_box_segment(house, Vector3(2.5, 0.15, 1.5), Vector3(1.5, 2.5, 1.0), Vector3(-0.1, -0.2, 0.1), _roof_mat, true)
 
 	_add_box_segment(house, Vector3(1.56, 0.12, 0.12), Vector3(0.0, 2.36, 2.94), Vector3.ZERO, _wood_mat, false)
-	_add_box_segment(house, Vector3(1.56, 0.06, 0.12), Vector3(0.0, 0.23, 2.94), Vector3.ZERO, _wood_mat, false)
+	_add_box_segment(house, Vector3(1.56, 0.02, 0.12), Vector3(0.0, 0.01, 2.94), Vector3.ZERO, _wood_mat, false)
 	_add_box_segment(house, Vector3(0.12, 2.2, 0.12), Vector3(-0.84, 1.3, 2.94), Vector3.ZERO, _wood_mat, false)
 	_add_box_segment(house, Vector3(0.12, 2.2, 0.12), Vector3(0.84, 1.3, 2.94), Vector3.ZERO, _wood_mat, false)
 
@@ -210,12 +210,12 @@ func _create_ruined_house(origin: Vector3, y_rot: float) -> void:
 func _add_house_door(house: Node3D) -> void:
 	var hinge: Node3D = Node3D.new()
 	hinge.name = "DoorHinge"
-	hinge.position = Vector3(-0.76, 0.24, 2.89)
+	hinge.position = Vector3(-0.76, 0.02, 2.89)
 	if _door_script != null:
 		hinge.set_script(_door_script)
 		hinge.set("interaction_distance", 2.45)
 		hinge.set("open_angle_deg", 103.0)
-		hinge.set("open_duration", 0.21)
+		hinge.set("open_duration", 0.62)
 		hinge.set("open_direction", -1.0)
 		hinge.set("require_facing_door", true)
 		hinge.set("facing_dot_threshold", -0.1)
@@ -227,15 +227,15 @@ func _add_house_door(house: Node3D) -> void:
 
 	var door_mesh: MeshInstance3D = MeshInstance3D.new()
 	var door_shape: BoxMesh = BoxMesh.new()
-	door_shape.size = Vector3(1.48, 2.12, 0.08)
+	door_shape.size = Vector3(1.42, 2.04, 0.075)
 	door_mesh.mesh = door_shape
 	door_mesh.material_override = _door_mat
-	door_mesh.position = Vector3(0.74, 1.06, 0.0)
+	door_mesh.position = Vector3(0.71, 1.02, 0.0)
 	door_body.add_child(door_mesh)
 
 	var collision: CollisionShape3D = CollisionShape3D.new()
 	var box: BoxShape3D = BoxShape3D.new()
-	box.size = Vector3(1.5, 2.14, 0.1)
+	box.size = Vector3(1.44, 2.06, 0.09)
 	collision.shape = box
 	collision.position = door_mesh.position
 	door_body.add_child(collision)

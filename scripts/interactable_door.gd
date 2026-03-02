@@ -3,7 +3,7 @@ class_name InteractableDoor
 
 @export var interaction_distance: float = 2.4
 @export var open_angle_deg: float = 98.0
-@export var open_duration: float = 0.24
+@export var open_duration: float = 0.62
 @export var open_direction: float = -1.0
 @export var require_facing_door: bool = true
 @export var facing_dot_threshold: float = 0.05
@@ -24,6 +24,7 @@ var _player: Node3D
 var _handle_pivot: Node3D
 var _handle_rest_rotation: Vector3 = Vector3.ZERO
 var _squeak_player: AudioStreamPlayer3D
+var _door_collision_shape: CollisionShape3D
 
 func _ready() -> void:
 	_ensure_input_action()
@@ -32,8 +33,10 @@ func _ready() -> void:
 	_open_y = _closed_y + deg_to_rad(open_angle_deg) * open_direction
 	_player = _find_player()
 	_handle_pivot = get_node_or_null(handle_path) as Node3D
+	_door_collision_shape = get_node_or_null("DoorBody/CollisionShape3D") as CollisionShape3D
 	if _handle_pivot != null:
 		_handle_rest_rotation = _handle_pivot.rotation
+	_set_door_collision_enabled(true)
 	_build_squeak_player()
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -84,6 +87,11 @@ func _is_nearest_door() -> bool:
 	return nearest == self
 
 func _toggle() -> void:
+	if not _is_open:
+		_set_door_collision_enabled(false)
+	else:
+		_set_door_collision_enabled(true)
+
 	_is_open = not _is_open
 	var target_y: float = _open_y if _is_open else _closed_y
 	_play_squeak()
@@ -173,3 +181,23 @@ func _play_squeak() -> void:
 		return
 	_squeak_player.pitch_scale = randf_range(squeak_pitch_min, squeak_pitch_max)
 	_squeak_player.play()
+
+func _set_door_collision_enabled(enabled: bool) -> void:
+	if _door_collision_shape != null:
+		_door_collision_shape.disabled = not enabled
+
+func is_open() -> bool:
+	return _is_open
+
+func can_player_interact(player_node: Node3D) -> bool:
+	if player_node == null:
+		return false
+	var player_pos: Vector3 = player_node.global_position
+	if player_pos.distance_to(global_position) > interaction_distance:
+		return false
+
+	if not require_facing_door:
+		return true
+	var to_door: Vector3 = (global_position - player_pos).normalized()
+	var player_forward: Vector3 = -player_node.global_transform.basis.z.normalized()
+	return player_forward.dot(to_door) >= facing_dot_threshold
