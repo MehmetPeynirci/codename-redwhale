@@ -50,6 +50,7 @@ var _mouse_sway: Vector2 = Vector2.ZERO
 var _elapsed_time: float = 0.0
 var _intro_active: bool = true
 var _blink_overlay: ColorRect
+var _injury_elapsed: float = 0.0
 
 func _ready() -> void:
 	_setup_default_input_map()
@@ -88,6 +89,8 @@ func _physics_process(delta: float) -> void:
 		_update_intro(delta)
 		return
 
+	_injury_elapsed += delta
+
 	var was_on_floor := is_on_floor()
 	var previous_vertical_velocity := velocity.y
 
@@ -103,7 +106,9 @@ func _physics_process(delta: float) -> void:
 		speed = sprint_speed
 
 	if _is_injured_phase():
-		speed *= injury_speed_multiplier
+		var limp_pulse := max(0.0, sin(_injury_elapsed * 8.5))
+		var limp_factor := injury_speed_multiplier * (0.9 - limp_pulse * 0.22)
+		speed *= limp_factor
 		if Input.is_action_pressed("move_sprint"):
 			speed = max(speed * 0.95, walk_speed * 0.95)
 
@@ -134,6 +139,7 @@ func _update_intro(delta: float) -> void:
 
 	if _elapsed_time >= intro_duration:
 		_intro_active = false
+		_injury_elapsed = 0.0
 		if is_instance_valid(_blink_overlay):
 			_blink_overlay.visible = false
 		head.position = _base_head_pos
@@ -198,7 +204,7 @@ func _setup_blink_overlay() -> void:
 	layer.add_child(_blink_overlay)
 
 func _is_injured_phase() -> bool:
-	return _elapsed_time < injury_duration
+	return _injury_elapsed < injury_duration
 
 func _update_crouch_state(delta: float) -> void:
 	var wants_crouch := Input.is_action_pressed("move_crouch")
@@ -231,11 +237,11 @@ func _apply_headbob(delta: float) -> void:
 		var limp_mul := 1.2 if _is_injured_phase() else 1.0
 		_bob_time += delta * horizontal_speed * headbob_frequency * bob_mul * limp_mul
 		var crouch_mul := 0.55 if _is_crouching else 1.0
-		var limp_side := sin(_bob_time * 0.5) * (0.018 if _is_injured_phase() else 0.0)
-		var bob_x := cos(_bob_time * 0.5) * headbob_amplitude * 0.45 * crouch_mul + limp_side
-		var bob_y := sin(_bob_time) * headbob_amplitude * crouch_mul
-		if _is_injured_phase():
-			bob_y = max(0.0, bob_y) * 1.15 - headbob_amplitude * 0.18
+			var limp_side := sin(_injury_elapsed * 7.0) * (0.03 if _is_injured_phase() else 0.0)
+			var bob_x := cos(_bob_time * 0.5) * headbob_amplitude * 0.45 * crouch_mul + limp_side
+			var bob_y := sin(_bob_time) * headbob_amplitude * crouch_mul
+			if _is_injured_phase():
+				bob_y = max(0.0, bob_y) * 1.3 - headbob_amplitude * 0.24
 		head.position = _base_head_pos + Vector3(bob_x, bob_y - _landing_offset, 0.0)
 	else:
 		_bob_time = lerp(_bob_time, 0.0, 8.0 * delta)
@@ -252,7 +258,7 @@ func _update_camera_effects(delta: float, input_dir: Vector2) -> void:
 		target_fov = sprint_fov
 	camera.fov = lerp(camera.fov, target_fov, min(1.0, fov_lerp_speed * delta))
 
-	var limp_roll := sin(_bob_time * 0.5) * 0.02 if _is_injured_phase() else 0.0
+	var limp_roll := sin(_injury_elapsed * 7.0) * 0.035 if _is_injured_phase() else 0.0
 	var target_roll := -input_dir.x * camera_tilt_strength + _mouse_sway.x + limp_roll
 	camera.rotation.z = lerp(camera.rotation.z, target_roll, min(1.0, 10.0 * delta))
 	camera.position = camera.position.lerp(_camera_base_pos + Vector3(_mouse_sway.x * 0.35, -_mouse_sway.y * 0.35, 0.0), min(1.0, 10.0 * delta))
