@@ -236,12 +236,12 @@ func _apply_headbob(delta: float) -> void:
 		var bob_mul := sprint_headbob_multiplier if Input.is_action_pressed("move_sprint") and not _is_crouching else 1.0
 		var limp_mul := 1.2 if _is_injured_phase() else 1.0
 		_bob_time += delta * horizontal_speed * headbob_frequency * bob_mul * limp_mul
-			var crouch_mul := 0.55 if _is_crouching else 1.0
-			var limp_side := sin(_injury_elapsed * 7.0) * (0.03 if _is_injured_phase() else 0.0)
-			var bob_x := cos(_bob_time * 0.5) * headbob_amplitude * 0.45 * crouch_mul + limp_side
-			var bob_y := sin(_bob_time) * headbob_amplitude * crouch_mul
-			if _is_injured_phase():
-				bob_y = max(0.0, bob_y) * 1.3 - headbob_amplitude * 0.24
+		var crouch_mul := 0.55 if _is_crouching else 1.0
+		var limp_side := sin(_injury_elapsed * 7.0) * (0.03 if _is_injured_phase() else 0.0)
+		var bob_x := cos(_bob_time * 0.5) * headbob_amplitude * 0.45 * crouch_mul + limp_side
+		var bob_y := sin(_bob_time) * headbob_amplitude * crouch_mul
+		if _is_injured_phase():
+			bob_y = max(0.0, bob_y) * 1.3 - headbob_amplitude * 0.24
 		head.position = _base_head_pos + Vector3(bob_x, bob_y - _landing_offset, 0.0)
 	else:
 		_bob_time = lerp(_bob_time, 0.0, 8.0 * delta)
