@@ -1,5 +1,21 @@
 extends CharacterBody3D
 
+const ACTION_UI_CANCEL: StringName = &"ui_cancel"
+const ACTION_CLICK_CAPTURE: StringName = &"click_capture"
+const ACTION_TOGGLE_NIGHT_VISION: StringName = &"toggle_night_vision"
+const ACTION_MOVE_FORWARD: StringName = &"move_forward"
+const ACTION_MOVE_BACK: StringName = &"move_back"
+const ACTION_MOVE_LEFT: StringName = &"move_left"
+const ACTION_MOVE_RIGHT: StringName = &"move_right"
+const ACTION_MOVE_JUMP: StringName = &"move_jump"
+const ACTION_MOVE_SPRINT: StringName = &"move_sprint"
+const ACTION_MOVE_CROUCH: StringName = &"move_crouch"
+const ACTION_INTERACT: StringName = &"interact"
+const ACTION_TOGGLE_DOOR: StringName = &"toggle_door"
+const GROUP_INTERACTABLE_DOORS: StringName = &"interactable_door"
+const NIGHT_VISION_LOCKED_HINT_DURATION: float = 2.2
+const NIGHT_VISION_PROMPT_TEXT: String = "Gece gorusu acmak icin F'ye basin"
+
 @export var mouse_sensitivity: float = 0.0018
 @export var walk_speed: float = 3.7
 @export var sprint_speed: float = 6.1
@@ -67,7 +83,7 @@ var _controls_locked: bool = false
 var _injury_time_left: float = 0.0
 var _injury_wobble_time: float = 0.0
 var _has_fuel: bool = false
-var _night_vision_on: bool = true
+var _night_vision_on: bool = false
 var _night_vision_unlocked: bool = false
 
 var _night_vision_overlay_layer: CanvasLayer
@@ -81,7 +97,7 @@ var _door_prompt_label: Label
 var _night_vision_prompt_bg: ColorRect
 var _night_vision_prompt_label: Label
 var _door_prompt_scan_left: float = 0.0
-var _nearby_door: Node3D
+var _nearby_door: InteractableDoor
 var _night_vision_prompt_time_left: float = 0.0
 
 func _ready() -> void:
@@ -112,15 +128,15 @@ func _ready() -> void:
 	_set_night_vision_enabled(_night_vision_on)
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_pressed("ui_cancel"):
+	if event.is_action_pressed(ACTION_UI_CANCEL):
 		Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 		return
-	if event.is_action_pressed("click_capture"):
+	if event.is_action_pressed(ACTION_CLICK_CAPTURE):
 		Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 		return
-	if event.is_action_pressed("toggle_night_vision"):
+	if event.is_action_pressed(ACTION_TOGGLE_NIGHT_VISION):
 		if not _night_vision_unlocked:
-			_show_night_vision_prompt(2.2)
+			_show_night_vision_prompt(NIGHT_VISION_LOCKED_HINT_DURATION)
 			return
 		_set_night_vision_enabled(not _night_vision_on)
 		_night_vision_prompt_time_left = 0.0
@@ -158,14 +174,14 @@ func _physics_process(delta: float) -> void:
 
 	_update_crouch_state(delta)
 
-	var input_dir: Vector2 = Input.get_vector("move_left", "move_right", "move_forward", "move_back")
+	var input_dir: Vector2 = Input.get_vector(ACTION_MOVE_LEFT, ACTION_MOVE_RIGHT, ACTION_MOVE_FORWARD, ACTION_MOVE_BACK)
 	var yaw_basis: Basis = Basis(Vector3.UP, rotation.y)
 	var wish_dir: Vector3 = (yaw_basis * Vector3(input_dir.x, 0.0, input_dir.y)).normalized()
 
 	var speed: float = walk_speed
 	if _is_crouching:
 		speed = crouch_speed
-	elif Input.is_action_pressed("move_sprint"):
+	elif Input.is_action_pressed(ACTION_MOVE_SPRINT):
 		speed = sprint_speed
 
 	var locomotion_scale: float = 1.0
@@ -179,13 +195,13 @@ func _physics_process(delta: float) -> void:
 		var limp_pulse: float = maxf(0.0, sin(_injury_wobble_time * 8.0))
 		var limp_factor: float = injury_speed_multiplier * (0.92 - limp_pulse * 0.22)
 		speed *= limp_factor
-		if Input.is_action_pressed("move_sprint"):
+		if Input.is_action_pressed(ACTION_MOVE_SPRINT):
 			speed = maxf(speed, walk_speed * 0.95)
 
 	var target_velocity: Vector3 = wish_dir * speed
 	var control: float = 1.0 if is_on_floor() else air_control
 	var accel: float = acceleration if wish_dir.length() > 0.0 else deceleration
-	if Input.is_action_pressed("move_sprint") and input_dir.y < -0.08 and wish_dir.length() > 0.0:
+	if Input.is_action_pressed(ACTION_MOVE_SPRINT) and input_dir.y < -0.08 and wish_dir.length() > 0.0:
 		accel *= sprint_acceleration_multiplier
 
 	velocity.x = move_toward(velocity.x, target_velocity.x, accel * control * delta)
@@ -193,7 +209,7 @@ func _physics_process(delta: float) -> void:
 
 	if not is_on_floor():
 		velocity.y -= _gravity * gravity_scale * delta
-	elif Input.is_action_just_pressed("move_jump") and not _is_crouching and not _is_injured_phase():
+	elif Input.is_action_just_pressed(ACTION_MOVE_JUMP) and not _is_crouching and not _is_injured_phase():
 		velocity.y = jump_velocity
 
 	move_and_slide()
@@ -421,17 +437,7 @@ func _update_door_prompt() -> void:
 	if _nearby_door == null:
 		_door_prompt_bg.visible = false
 		return
-	if _nearby_door.has_method("get_prompt_text"):
-		_door_prompt_label.text = str(_nearby_door.call("get_prompt_text"))
-		_door_prompt_bg.visible = true
-		return
-	if not _nearby_door.has_method("is_open"):
-		_door_prompt_bg.visible = false
-		return
-
-	var door_is_open: bool = bool(_nearby_door.call("is_open"))
-	var open_text: String = "Kapiyi kapatmak icin P'ye basin" if door_is_open else "Kapiyi acmak icin P'ye basin"
-	_door_prompt_label.text = open_text
+	_door_prompt_label.text = _nearby_door.get_prompt_text()
 	_door_prompt_bg.visible = true
 
 func _update_night_vision_prompt() -> void:
@@ -440,21 +446,18 @@ func _update_night_vision_prompt() -> void:
 	var should_show: bool = _night_vision_unlocked and not _night_vision_on and _night_vision_prompt_time_left > 0.0
 	_night_vision_prompt_bg.visible = should_show
 	if should_show:
-		_night_vision_prompt_label.text = "Gece gorusu acmak icin F'ye basin"
+		_night_vision_prompt_label.text = NIGHT_VISION_PROMPT_TEXT
 
-func _find_nearby_door() -> Node3D:
-	var nearest: Node3D = null
+func _find_nearby_door() -> InteractableDoor:
+	var nearest: InteractableDoor = null
 	var nearest_dist_sq: float = INF
-	var door_nodes: Array[Node] = get_tree().get_nodes_in_group("interactable_door")
+	var door_nodes: Array[Node] = get_tree().get_nodes_in_group(GROUP_INTERACTABLE_DOORS)
 
 	for i in range(door_nodes.size()):
-		var door: Node3D = door_nodes[i] as Node3D
+		var door: InteractableDoor = door_nodes[i] as InteractableDoor
 		if door == null:
 			continue
-		if not door.has_method("can_player_interact"):
-			continue
-		var can_interact: bool = bool(door.call("can_player_interact", self))
-		if not can_interact:
+		if not door.can_player_interact(self):
 			continue
 
 		var dist_sq: float = global_position.distance_squared_to(door.global_position)
@@ -468,7 +471,7 @@ func _is_injured_phase() -> bool:
 	return _injury_time_left > 0.0
 
 func _update_crouch_state(delta: float) -> void:
-	var wants_crouch: bool = Input.is_action_pressed("move_crouch")
+	var wants_crouch: bool = Input.is_action_pressed(ACTION_MOVE_CROUCH)
 	if not wants_crouch and _would_hit_ceiling():
 		_is_crouching = true
 	else:
@@ -494,7 +497,7 @@ func _would_hit_ceiling() -> bool:
 func _apply_headbob(delta: float) -> void:
 	var horizontal_speed: float = Vector2(velocity.x, velocity.z).length()
 	if is_on_floor() and horizontal_speed > 0.1:
-		var bob_mul: float = sprint_headbob_multiplier if Input.is_action_pressed("move_sprint") and not _is_crouching else 1.0
+		var bob_mul: float = sprint_headbob_multiplier if Input.is_action_pressed(ACTION_MOVE_SPRINT) and not _is_crouching else 1.0
 		var limp_mul: float = 1.2 if _is_injured_phase() else 1.0
 		_bob_time += delta * horizontal_speed * headbob_frequency * bob_mul * limp_mul
 
@@ -517,7 +520,7 @@ func _update_camera_effects(delta: float, input_dir: Vector2) -> void:
 	var target_fov: float = walk_fov
 	if _is_crouching:
 		target_fov = crouch_fov
-	elif Input.is_action_pressed("move_sprint") and is_on_floor() and input_dir.y < -0.1 and not _is_injured_phase():
+	elif Input.is_action_pressed(ACTION_MOVE_SPRINT) and is_on_floor() and input_dir.y < -0.1 and not _is_injured_phase():
 		target_fov = sprint_fov
 	camera.fov = lerpf(camera.fov, target_fov, minf(1.0, fov_lerp_speed * delta))
 
@@ -534,17 +537,17 @@ func _update_camera_effects(delta: float, input_dir: Vector2) -> void:
 	camera.position = camera.position.lerp(_camera_base_pos + sway_offset, minf(1.0, 10.0 * delta))
 
 func _setup_default_input_map() -> void:
-	_add_action_if_missing("move_forward", KEY_W)
-	_add_action_if_missing("move_back", KEY_S)
-	_add_action_if_missing("move_left", KEY_A)
-	_add_action_if_missing("move_right", KEY_D)
-	_add_action_if_missing("move_jump", KEY_SPACE)
-	_add_action_if_missing("move_sprint", KEY_SHIFT)
-	_add_action_if_missing("move_crouch", KEY_CTRL)
-	_add_action_if_missing("interact", KEY_E)
-	_add_action_if_missing("toggle_door", KEY_P)
-	_add_action_if_missing("toggle_night_vision", KEY_F)
-	_add_action_if_missing("click_capture", MOUSE_BUTTON_LEFT, true)
+	_add_action_if_missing(ACTION_MOVE_FORWARD, KEY_W)
+	_add_action_if_missing(ACTION_MOVE_BACK, KEY_S)
+	_add_action_if_missing(ACTION_MOVE_LEFT, KEY_A)
+	_add_action_if_missing(ACTION_MOVE_RIGHT, KEY_D)
+	_add_action_if_missing(ACTION_MOVE_JUMP, KEY_SPACE)
+	_add_action_if_missing(ACTION_MOVE_SPRINT, KEY_SHIFT)
+	_add_action_if_missing(ACTION_MOVE_CROUCH, KEY_CTRL)
+	_add_action_if_missing(ACTION_INTERACT, KEY_E)
+	_add_action_if_missing(ACTION_TOGGLE_DOOR, KEY_P)
+	_add_action_if_missing(ACTION_TOGGLE_NIGHT_VISION, KEY_F)
+	_add_action_if_missing(ACTION_CLICK_CAPTURE, MOUSE_BUTTON_LEFT, true)
 
 func _add_action_if_missing(action: StringName, keycode: int, is_mouse: bool = false) -> void:
 	if not InputMap.has_action(action):

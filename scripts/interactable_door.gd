@@ -1,12 +1,20 @@
 extends Node3D
 class_name InteractableDoor
 
+const ACTION_TOGGLE_DOOR: StringName = &"toggle_door"
+const GROUP_INTERACTABLE_DOORS: StringName = &"interactable_door"
+const GROUP_PLAYERS: StringName = &"player"
+const DOOR_BODY_PATH: NodePath = NodePath("DoorBody")
+const DOOR_COLLISION_PATH: NodePath = NodePath("DoorBody/CollisionShape3D")
+
 @export var interaction_distance: float = 2.4
-@export var open_angle_deg: float = 98.0
+@export var open_angle_deg: float = 118.0
 @export var open_duration: float = 0.62
 @export var open_direction: float = -1.0
+@export var auto_open_away_from_player: bool = true
 @export var require_facing_door: bool = true
 @export var facing_dot_threshold: float = 0.05
+@export var toggle_cooldown_sec: float = 0.18
 @export var starts_locked: bool = false
 @export var locked_prompt: String = "Kilitli. Mezar sembollerini cozmeyi dene."
 @export var open_prompt: String = "Kapiyi acmak icin P'ye basin"
@@ -29,11 +37,16 @@ var _handle_pivot: Node3D
 var _handle_rest_rotation: Vector3 = Vector3.ZERO
 var _squeak_player: AudioStreamPlayer3D
 var _door_collision_shape: CollisionShape3D
+var _door_body: CollisionObject3D
+var _door_body_layer: int = 0
+var _door_body_mask: int = 0
+var _door_body_layers_cached: bool = false
 var _locked: bool = false
+var _last_toggle_msec: int = -999999
 
 func _ready() -> void:
 	_ensure_input_action()
-	add_to_group("interactable_door")
+	add_to_group(GROUP_INTERACTABLE_DOORS)
 	_closed_y = rotation.y
 	_open_y = _closed_y + deg_to_rad(open_angle_deg) * open_direction
 	_locked = starts_locked
@@ -45,12 +58,20 @@ func _ready() -> void:
 	_build_squeak_player()
 
 func _unhandled_input(event: InputEvent) -> void:
-	if not event.is_action_pressed("toggle_door"):
+	if event is InputEventKey:
+		var key_event: InputEventKey = event as InputEventKey
+		if key_event != null and key_event.echo:
+			return
+	if not event.is_action_pressed(ACTION_TOGGLE_DOOR):
+		return
+	var now_msec: int = Time.get_ticks_msec()
+	if _is_toggle_cooldown_active(now_msec):
 		return
 	if not _can_interact():
 		return
 	if not _is_nearest_door():
 		return
+	_last_toggle_msec = now_msec
 	_toggle()
 
 func _can_interact() -> bool:
@@ -58,31 +79,22 @@ func _can_interact() -> bool:
 		_player = _find_player()
 		if _player == null:
 			return false
-
-	var player_pos: Vector3 = _player.global_position
-	if player_pos.distance_to(global_position) > interaction_distance:
-		return false
-
-	if not require_facing_door:
-		return true
-
-	var to_door: Vector3 = (global_position - player_pos).normalized()
-	var player_forward: Vector3 = -_player.global_transform.basis.z.normalized()
-	var alignment: float = player_forward.dot(to_door)
-	return alignment >= facing_dot_threshold
+	return can_player_interact(_player)
 
 func _is_nearest_door() -> bool:
 	if _player == null:
 		return false
 
 	var player_pos: Vector3 = _player.global_position
-	var nearest: InteractableDoor = self
-	var nearest_dist_sq: float = player_pos.distance_squared_to(global_position)
-	var door_nodes: Array[Node] = get_tree().get_nodes_in_group("interactable_door")
+	var nearest: InteractableDoor = null
+	var nearest_dist_sq: float = INF
+	var door_nodes: Array[Node] = get_tree().get_nodes_in_group(GROUP_INTERACTABLE_DOORS)
 
 	for i in range(door_nodes.size()):
 		var other: InteractableDoor = door_nodes[i] as InteractableDoor
 		if other == null:
+			continue
+		if not other.can_player_interact(_player):
 			continue
 		var dist_sq: float = player_pos.distance_squared_to(other.global_position)
 		if dist_sq < nearest_dist_sq:
@@ -91,12 +103,18 @@ func _is_nearest_door() -> bool:
 
 	return nearest == self
 
+func _is_toggle_cooldown_active(now_msec: int) -> bool:
+	var min_gap_msec: int = int(toggle_cooldown_sec * 1000.0)
+	return now_msec - _last_toggle_msec < min_gap_msec
+
 func _toggle() -> void:
 	if _locked:
 		_play_squeak()
 		return
 
 	_cache_nodes()
+	if not _is_open and auto_open_away_from_player:
+		_adjust_open_direction_from_player()
 	if not _is_open:
 		_set_door_collision_enabled(false)
 
@@ -106,6 +124,13 @@ func _toggle() -> void:
 	_play_squeak()
 	_animate_handle()
 	_animate_rotation(target_y, enable_collision_on_finish)
+
+func _adjust_open_direction_from_player() -> void:
+	if _player == null:
+		return
+	var local_player: Vector3 = to_local(_player.global_position)
+	open_direction = -1.0 if local_player.x >= 0.0 else 1.0
+	_open_y = _closed_y + deg_to_rad(open_angle_deg) * open_direction
 
 func _animate_rotation(target_y: float, enable_collision_on_finish: bool) -> void:
 	if _anim_tween != null and _anim_tween.is_running():
@@ -133,20 +158,22 @@ func _animate_handle() -> void:
 	_handle_tween.tween_property(_handle_pivot, "rotation", _handle_rest_rotation, handle_press_duration * 1.2)
 
 func _find_player() -> Node3D:
-	var players: Array[Node] = get_tree().get_nodes_in_group("player")
+	var players: Array[Node] = get_tree().get_nodes_in_group(GROUP_PLAYERS)
 	if players.is_empty():
 		return null
 	return players[0] as Node3D
 
 func _ensure_input_action() -> void:
-	if not InputMap.has_action("toggle_door"):
-		InputMap.add_action("toggle_door")
-	if InputMap.action_get_events("toggle_door").is_empty():
+	if not InputMap.has_action(ACTION_TOGGLE_DOOR):
+		InputMap.add_action(ACTION_TOGGLE_DOOR)
+	if InputMap.action_get_events(ACTION_TOGGLE_DOOR).is_empty():
 		var key_event: InputEventKey = InputEventKey.new()
 		key_event.physical_keycode = KEY_P
-		InputMap.action_add_event("toggle_door", key_event)
+		InputMap.action_add_event(ACTION_TOGGLE_DOOR, key_event)
 
 func _build_squeak_player() -> void:
+	if _squeak_player != null and is_instance_valid(_squeak_player):
+		return
 	_squeak_player = AudioStreamPlayer3D.new()
 	_squeak_player.name = "DoorSqueakPlayer"
 	_squeak_player.stream = _build_squeak_stream()
@@ -196,7 +223,14 @@ func _play_squeak() -> void:
 func _set_door_collision_enabled(enabled: bool) -> void:
 	_cache_nodes()
 	if _door_collision_shape != null:
-		_door_collision_shape.disabled = not enabled
+		_door_collision_shape.set_deferred("disabled", not enabled)
+	if _door_body != null:
+		if not enabled:
+			_door_body.collision_layer = 0
+			_door_body.collision_mask = 0
+		elif _door_body_layers_cached:
+			_door_body.collision_layer = _door_body_layer
+			_door_body.collision_mask = _door_body_mask
 
 func is_open() -> bool:
 	return _is_open
@@ -231,4 +265,10 @@ func _cache_nodes() -> void:
 	if _handle_pivot == null:
 		_handle_pivot = get_node_or_null(handle_path) as Node3D
 	if _door_collision_shape == null:
-		_door_collision_shape = get_node_or_null("DoorBody/CollisionShape3D") as CollisionShape3D
+		_door_collision_shape = get_node_or_null(DOOR_COLLISION_PATH) as CollisionShape3D
+	if _door_body == null:
+		_door_body = get_node_or_null(DOOR_BODY_PATH) as CollisionObject3D
+	if _door_body != null and not _door_body_layers_cached:
+		_door_body_layer = _door_body.collision_layer
+		_door_body_mask = _door_body.collision_mask
+		_door_body_layers_cached = true

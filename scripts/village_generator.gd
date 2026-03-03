@@ -1,5 +1,21 @@
 extends Node3D
 
+const HOUSE_DOOR_HINGE_POSITION: Vector3 = Vector3(-0.89, 0.02, 2.89)
+const HOUSE_DOOR_INTERACTION_DISTANCE: float = 2.45
+const HOUSE_DOOR_OPEN_ANGLE_DEG: float = 126.0
+const HOUSE_DOOR_OPEN_DURATION: float = 0.62
+const HOUSE_DOOR_OPEN_DIRECTION: float = -1.0
+const HOUSE_DOOR_FACING_DOT_THRESHOLD: float = -0.1
+const HOUSE_DOOR_MESH_SIZE: Vector3 = Vector3(1.42, 2.04, 0.075)
+const HOUSE_DOOR_MESH_POSITION: Vector3 = Vector3(0.71, 1.02, 0.0)
+const HOUSE_DOOR_COLLISION_SIZE: Vector3 = Vector3(1.44, 1.9, 0.09)
+const HOUSE_DOOR_COLLISION_POSITION_Y: float = 1.0
+const HOUSE_DOOR_HANDLE_POSITION: Vector3 = Vector3(1.20, 1.04, 0.055)
+const HOUSE_DOOR_HANDLE_BASE_RADIUS: float = 0.022
+const HOUSE_DOOR_HANDLE_BASE_HEIGHT: float = 0.05
+const HOUSE_DOOR_HANDLE_BAR_SIZE: Vector3 = Vector3(0.22, 0.028, 0.028)
+const HOUSE_DOOR_HANDLE_BAR_POSITION: Vector3 = Vector3(0.11, 0.0, 0.01)
+
 @export var grave_count: int = 14
 @export var village_radius: float = 90.0
 @export var tree_count: int = 84
@@ -414,45 +430,60 @@ func _create_ruined_house(index: int, origin: Vector3, y_rot: float) -> Node3D:
 func _add_house_door(house: Node3D) -> Node3D:
 	var hinge: Node3D = Node3D.new()
 	hinge.name = "DoorHinge"
-	hinge.position = Vector3(-0.76, 0.02, 2.89)
-	if _door_script != null:
-		hinge.set_script(_door_script)
-		hinge.set("interaction_distance", 2.45)
-		hinge.set("open_angle_deg", 103.0)
-		hinge.set("open_duration", 0.62)
-		hinge.set("open_direction", -1.0)
-		hinge.set("require_facing_door", true)
-		hinge.set("facing_dot_threshold", -0.1)
+	hinge.position = HOUSE_DOOR_HINGE_POSITION
+	_configure_house_door_interaction(hinge)
 
 	var door_body: AnimatableBody3D = AnimatableBody3D.new()
 	door_body.name = "DoorBody"
 	hinge.add_child(door_body)
 
+	var door_mesh: MeshInstance3D = _create_house_door_mesh()
+	door_body.add_child(door_mesh)
+	door_body.add_child(_create_house_door_collision())
+	door_body.add_child(_create_house_door_handle())
+
+	house.add_child(hinge)
+	return hinge
+
+func _configure_house_door_interaction(hinge: Node3D) -> void:
+	if _door_script == null:
+		return
+	hinge.set_script(_door_script)
+	hinge.set("interaction_distance", HOUSE_DOOR_INTERACTION_DISTANCE)
+	hinge.set("open_angle_deg", HOUSE_DOOR_OPEN_ANGLE_DEG)
+	hinge.set("open_duration", HOUSE_DOOR_OPEN_DURATION)
+	hinge.set("open_direction", HOUSE_DOOR_OPEN_DIRECTION)
+	hinge.set("auto_open_away_from_player", true)
+	hinge.set("require_facing_door", true)
+	hinge.set("facing_dot_threshold", HOUSE_DOOR_FACING_DOT_THRESHOLD)
+
+func _create_house_door_mesh() -> MeshInstance3D:
 	var door_mesh: MeshInstance3D = MeshInstance3D.new()
 	var door_shape: BoxMesh = BoxMesh.new()
-	door_shape.size = Vector3(1.42, 2.04, 0.075)
+	door_shape.size = HOUSE_DOOR_MESH_SIZE
 	door_mesh.mesh = door_shape
 	door_mesh.material_override = _door_mat
-	door_mesh.position = Vector3(0.71, 1.02, 0.0)
-	door_body.add_child(door_mesh)
+	door_mesh.position = HOUSE_DOOR_MESH_POSITION
+	return door_mesh
 
+func _create_house_door_collision() -> CollisionShape3D:
 	var collision: CollisionShape3D = CollisionShape3D.new()
 	var box: BoxShape3D = BoxShape3D.new()
-	box.size = Vector3(1.44, 2.06, 0.09)
+	box.size = HOUSE_DOOR_COLLISION_SIZE
 	collision.shape = box
-	collision.position = door_mesh.position
-	door_body.add_child(collision)
+	collision.position = Vector3(HOUSE_DOOR_MESH_POSITION.x, HOUSE_DOOR_COLLISION_POSITION_Y, HOUSE_DOOR_MESH_POSITION.z)
+	return collision
 
+func _create_house_door_handle() -> Node3D:
 	var handle_pivot: Node3D = Node3D.new()
 	handle_pivot.name = "HandlePivot"
-	handle_pivot.position = Vector3(1.20, 1.04, 0.055)
-	door_body.add_child(handle_pivot)
+	handle_pivot.position = HOUSE_DOOR_HANDLE_POSITION
 
 	var handle_base: MeshInstance3D = MeshInstance3D.new()
 	var base_mesh: CylinderMesh = CylinderMesh.new()
-	base_mesh.top_radius = 0.022
-	base_mesh.bottom_radius = 0.022
-	base_mesh.height = 0.05
+	base_mesh.top_radius = HOUSE_DOOR_HANDLE_BASE_RADIUS
+	base_mesh.bottom_radius = HOUSE_DOOR_HANDLE_BASE_RADIUS
+	base_mesh.height = HOUSE_DOOR_HANDLE_BASE_HEIGHT
 	handle_base.mesh = base_mesh
 	handle_base.material_override = _wood_mat
 	handle_base.rotation_degrees = Vector3(90.0, 0.0, 0.0)
@@ -460,14 +491,12 @@ func _add_house_door(house: Node3D) -> Node3D:
 
 	var handle_bar: MeshInstance3D = MeshInstance3D.new()
 	var bar_mesh: BoxMesh = BoxMesh.new()
-	bar_mesh.size = Vector3(0.22, 0.028, 0.028)
+	bar_mesh.size = HOUSE_DOOR_HANDLE_BAR_SIZE
 	handle_bar.mesh = bar_mesh
 	handle_bar.material_override = _wood_mat
-	handle_bar.position = Vector3(0.11, 0.0, 0.01)
+	handle_bar.position = HOUSE_DOOR_HANDLE_BAR_POSITION
 	handle_pivot.add_child(handle_bar)
-
-	house.add_child(hinge)
-	return hinge
+	return handle_pivot
 
 func _create_graves() -> void:
 	var grave_root: Node3D = Node3D.new()
