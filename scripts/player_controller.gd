@@ -52,6 +52,8 @@ const CAMCORDER_BATTERY_FILL_WIDTH: float = 86.0
 @export var camera_roll_sway_enabled: bool = true
 @export var camera_noise_strength: float = 0.0019
 @export var camera_noise_speed: float = 1.28
+@export var handheld_camera_motion_enabled: bool = false
+@export var show_camera_in_hand: bool = false
 
 @export var injury_default_duration: float = 15.0
 @export var injury_speed_multiplier: float = 0.72
@@ -71,6 +73,8 @@ const CAMCORDER_BATTERY_FILL_WIDTH: float = 86.0
 @onready var collision_shape: CollisionShape3D = $CollisionShape3D
 @onready var night_vision_rig: Node3D = $Head/NightVisionRig
 @onready var night_vision_ir_light: SpotLight3D = $Head/NightVisionRig/IRIlluminator
+@onready var night_vision_camera_body: MeshInstance3D = $Head/NightVisionRig/CameraBody
+@onready var night_vision_camera_lens: MeshInstance3D = $Head/NightVisionRig/CameraLens
 
 var _gravity: float = float(ProjectSettings.get_setting("physics/3d/default_gravity"))
 var _pitch: float = 0.0
@@ -138,6 +142,10 @@ func _ready() -> void:
 	_build_prompt_overlay()
 	_build_camcorder_hud()
 	_apply_night_vision_settings()
+	if night_vision_camera_body != null:
+		night_vision_camera_body.visible = show_camera_in_hand
+	if night_vision_camera_lens != null:
+		night_vision_camera_lens.visible = show_camera_in_hand
 	_night_vision_on = false
 	_night_vision_unlocked = false
 	if night_vision_starts_on:
@@ -321,6 +329,10 @@ func _apply_night_vision_settings() -> void:
 func _update_night_vision_motion(delta: float) -> void:
 	if night_vision_rig == null:
 		return
+	if not handheld_camera_motion_enabled:
+		night_vision_rig.position = night_vision_rig.position.lerp(_night_vision_base_pos, minf(1.0, delta * 10.0))
+		night_vision_rig.rotation = night_vision_rig.rotation.lerp(_night_vision_base_rot, minf(1.0, delta * 10.0))
+		return
 
 	var injury_shake: float = sin(_injury_wobble_time * 6.3) * (0.016 if _is_injured_phase() else 0.0)
 	var bob_x: float = cos(_bob_time * 0.55) * 0.008
@@ -370,7 +382,7 @@ func _build_night_vision_overlay() -> void:
 	_night_vision_label = Label.new()
 	_night_vision_label.text = "NV CAM"
 	_night_vision_label.position = Vector2(18.0, 14.0)
-	_night_vision_label.add_theme_color_override("font_color", Color(0.56, 1.0, 0.62, 0.95))
+	_night_vision_label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 1.0))
 	_night_vision_label.add_theme_font_size_override("font_size", 15)
 	_night_vision_overlay_layer.add_child(_night_vision_label)
 
@@ -406,7 +418,7 @@ func _build_prompt_overlay() -> void:
 	_door_prompt_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_door_prompt_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_door_prompt_label.add_theme_font_size_override("font_size", 18)
-	_door_prompt_label.add_theme_color_override("font_color", Color(0.93, 0.95, 0.97, 1.0))
+	_door_prompt_label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 1.0))
 	_door_prompt_bg.add_child(_door_prompt_label)
 
 	_night_vision_prompt_bg = ColorRect.new()
@@ -435,7 +447,7 @@ func _build_prompt_overlay() -> void:
 	_night_vision_prompt_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_night_vision_prompt_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_night_vision_prompt_label.add_theme_font_size_override("font_size", 16)
-	_night_vision_prompt_label.add_theme_color_override("font_color", Color(0.82, 0.97, 0.86, 0.96))
+	_night_vision_prompt_label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 1.0))
 	_night_vision_prompt_bg.add_child(_night_vision_prompt_label)
 
 func _build_camcorder_hud() -> void:
@@ -496,6 +508,7 @@ func _build_camcorder_hud() -> void:
 	_camcorder_rec_label.offset_bottom = 42.0
 	_camcorder_rec_label.text = "REC  1080P / 24FPS"
 	_camcorder_rec_label.add_theme_font_size_override("font_size", 15)
+	_camcorder_rec_label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 1.0))
 	root.add_child(_camcorder_rec_label)
 	_camcorder_labels.append(_camcorder_rec_label)
 
@@ -510,6 +523,7 @@ func _build_camcorder_hud() -> void:
 	_camcorder_time_label.offset_bottom = -28.0
 	_camcorder_time_label.text = "00:00:00"
 	_camcorder_time_label.add_theme_font_size_override("font_size", 17)
+	_camcorder_time_label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 1.0))
 	root.add_child(_camcorder_time_label)
 	_camcorder_labels.append(_camcorder_time_label)
 
@@ -525,6 +539,7 @@ func _build_camcorder_hud() -> void:
 	_camcorder_mode_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	_camcorder_mode_label.text = "STD  AUTO  F2.8  1/60"
 	_camcorder_mode_label.add_theme_font_size_override("font_size", 14)
+	_camcorder_mode_label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 1.0))
 	root.add_child(_camcorder_mode_label)
 	_camcorder_labels.append(_camcorder_mode_label)
 
@@ -564,6 +579,7 @@ func _build_camcorder_hud() -> void:
 	_camcorder_battery_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	_camcorder_battery_label.text = "BAT"
 	_camcorder_battery_label.add_theme_font_size_override("font_size", 12)
+	_camcorder_battery_label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 1.0))
 	root.add_child(_camcorder_battery_label)
 	_camcorder_labels.append(_camcorder_battery_label)
 
@@ -622,15 +638,14 @@ func _update_camcorder_hud(delta: float) -> void:
 	if _camcorder_mode_label != null:
 		_camcorder_mode_label.text = "NV ON  AUTO  F2.8  1/60" if _night_vision_on else "STD  AUTO  F2.8  1/60"
 
-	var hud_tint: Color = Color(0.64, 1.0, 0.68, 0.96) if _night_vision_on else Color(0.92, 0.95, 0.99, 0.9)
 	for i in range(_camcorder_labels.size()):
 		var label: Label = _camcorder_labels[i]
 		if label != null:
-			label.modulate = hud_tint
+			label.modulate = Color(1.0, 1.0, 1.0, 1.0)
 	for i in range(_camcorder_frame_lines.size()):
 		var line: ColorRect = _camcorder_frame_lines[i]
 		if line != null:
-			line.color = Color(hud_tint.r, hud_tint.g, hud_tint.b, 0.34)
+			line.color = Color(1.0, 1.0, 1.0, 0.34)
 
 func _update_prompt_state(delta: float) -> void:
 	if _night_vision_prompt_time_left > 0.0:
@@ -711,6 +726,11 @@ func _would_hit_ceiling() -> bool:
 	return test_move(global_transform, Vector3.UP * diff)
 
 func _apply_headbob(delta: float) -> void:
+	if not handheld_camera_motion_enabled:
+		_bob_time = lerpf(_bob_time, 0.0, 8.0 * delta)
+		head.position = head.position.lerp(_base_head_pos, minf(1.0, 10.0 * delta))
+		return
+
 	var horizontal_speed: float = Vector2(velocity.x, velocity.z).length()
 	if is_on_floor() and horizontal_speed > 0.1:
 		var bob_mul: float = sprint_headbob_multiplier if Input.is_action_pressed(ACTION_MOVE_SPRINT) and not _is_crouching else 1.0
@@ -730,18 +750,24 @@ func _apply_headbob(delta: float) -> void:
 		head.position = head.position.lerp(_base_head_pos - Vector3(0.0, _landing_offset, 0.0), minf(1.0, 10.0 * delta))
 
 func _update_camera_effects(delta: float, input_dir: Vector2) -> void:
-	_landing_offset = lerpf(_landing_offset, 0.0, minf(1.0, landing_recover_speed * delta))
-	_mouse_sway = _mouse_sway.lerp(Vector2.ZERO, minf(1.0, 8.0 * delta))
-	var horizontal_speed: float = Vector2(velocity.x, velocity.z).length()
-	var movement_noise_scale: float = 0.7 + clampf(horizontal_speed / maxf(walk_speed, 0.01), 0.0, 1.0) * 0.55
-	_camera_noise_time += delta * camera_noise_speed * movement_noise_scale
-
 	var target_fov: float = walk_fov
 	if _is_crouching:
 		target_fov = crouch_fov
 	elif Input.is_action_pressed(ACTION_MOVE_SPRINT) and is_on_floor() and input_dir.y < -0.1 and not _is_injured_phase():
 		target_fov = sprint_fov
 	camera.fov = lerpf(camera.fov, target_fov, minf(1.0, fov_lerp_speed * delta))
+	if not handheld_camera_motion_enabled:
+		_landing_offset = lerpf(_landing_offset, 0.0, minf(1.0, landing_recover_speed * delta))
+		_mouse_sway = Vector2.ZERO
+		camera.rotation = Vector3.ZERO
+		camera.position = camera.position.lerp(_camera_base_pos, minf(1.0, 12.0 * delta))
+		return
+
+	_landing_offset = lerpf(_landing_offset, 0.0, minf(1.0, landing_recover_speed * delta))
+	_mouse_sway = _mouse_sway.lerp(Vector2.ZERO, minf(1.0, 8.0 * delta))
+	var horizontal_speed: float = Vector2(velocity.x, velocity.z).length()
+	var movement_noise_scale: float = 0.7 + clampf(horizontal_speed / maxf(walk_speed, 0.01), 0.0, 1.0) * 0.55
+	_camera_noise_time += delta * camera_noise_speed * movement_noise_scale
 
 	var noise_x: float = sin(_camera_noise_time * 1.3) * camera_noise_strength
 	noise_x += sin(_camera_noise_time * 2.75 + 0.65) * camera_noise_strength * 0.42
