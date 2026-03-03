@@ -14,7 +14,7 @@ const ACTION_INTERACT: StringName = &"interact"
 const ACTION_TOGGLE_DOOR: StringName = &"toggle_door"
 const GROUP_INTERACTABLE_DOORS: StringName = &"interactable_door"
 const NIGHT_VISION_LOCKED_HINT_DURATION: float = 2.2
-const NIGHT_VISION_PROMPT_TEXT: String = "Gece gorusu acmak icin F'ye basin"
+const NIGHT_VISION_PROMPT_TEXT: String = "Gece gorusunu acmak icin F harfine basin"
 
 @export var mouse_sensitivity: float = 0.0018
 @export var walk_speed: float = 3.7
@@ -60,7 +60,7 @@ const NIGHT_VISION_PROMPT_TEXT: String = "Gece gorusu acmak icin F'ye basin"
 @export var night_vision_ir_attenuation: float = 0.84
 @export var night_vision_ir_color: Color = Color(0.30, 1.0, 0.36, 1.0)
 @export var night_vision_ir_shadow_enabled: bool = false
-@export var night_vision_unlock_prompt_duration: float = 5.0
+@export var night_vision_unlock_prompt_duration: float = 10.0
 @export var prompt_scan_interval: float = 0.09
 
 @onready var head: Node3D = $Head
@@ -391,14 +391,14 @@ func _build_prompt_overlay() -> void:
 	_door_prompt_bg.add_child(_door_prompt_label)
 
 	_night_vision_prompt_bg = ColorRect.new()
-	_night_vision_prompt_bg.anchor_left = 1.0
-	_night_vision_prompt_bg.anchor_top = 0.0
-	_night_vision_prompt_bg.anchor_right = 1.0
-	_night_vision_prompt_bg.anchor_bottom = 0.0
-	_night_vision_prompt_bg.offset_left = -380.0
-	_night_vision_prompt_bg.offset_top = 26.0
-	_night_vision_prompt_bg.offset_right = -20.0
-	_night_vision_prompt_bg.offset_bottom = 64.0
+	_night_vision_prompt_bg.anchor_left = 0.5
+	_night_vision_prompt_bg.anchor_top = 1.0
+	_night_vision_prompt_bg.anchor_right = 0.5
+	_night_vision_prompt_bg.anchor_bottom = 1.0
+	_night_vision_prompt_bg.offset_left = -250.0
+	_night_vision_prompt_bg.offset_top = -136.0
+	_night_vision_prompt_bg.offset_right = 250.0
+	_night_vision_prompt_bg.offset_bottom = -96.0
 	_night_vision_prompt_bg.color = Color(0.02, 0.03, 0.04, 0.74)
 	_night_vision_prompt_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_night_vision_prompt_bg.visible = false

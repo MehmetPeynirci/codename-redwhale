@@ -863,12 +863,12 @@ func _create_road_signpost() -> void:
 	_add_box_segment(sign_root, Vector3(2.6, 0.86, 0.16), Vector3(0.0, 1.88, -0.02), Vector3(0.03, 0.0, 0.0), _wood_mat, false)
 
 	var sign_text: Label3D = Label3D.new()
-	sign_text.text = "Mezit - Uc Catalli - Golge Koyu"
-	sign_text.font_size = 62
+	sign_text.text = "Golge Koyu"
+	sign_text.font_size = 44
 	sign_text.modulate = Color(0.87, 0.83, 0.74, 0.95)
 	sign_text.outline_modulate = Color(0.02, 0.02, 0.02, 0.8)
 	sign_text.outline_size = 3
-	sign_text.position = Vector3(-1.16, 2.01, 0.09)
+	sign_text.position = Vector3(-0.72, 2.01, 0.09)
 	sign_text.rotation = Vector3(0.0, PI * 0.5, 0.0)
 	sign_root.add_child(sign_text)
 
