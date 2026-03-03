@@ -9,7 +9,7 @@ uniform float moon_glow : hint_range(0.0, 2.0) = 0.58;
 uniform float star_density : hint_range(200.0, 2400.0) = 1450.0;
 uniform float star_intensity : hint_range(0.0, 2.0) = 1.02;
 uniform float twinkle_speed : hint_range(0.0, 8.0) = 1.8;
-uniform float sky_exposure : hint_range(0.2, 2.0) = 0.94;
+uniform float sky_exposure : hint_range(0.2, 2.0) = 1.03;
 
 float hash12(vec2 p) {
 	vec3 p3 = fract(vec3(p.xyx) * 0.1031);

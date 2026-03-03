@@ -15,6 +15,8 @@ const ACTION_TOGGLE_DOOR: StringName = &"toggle_door"
 const GROUP_INTERACTABLE_DOORS: StringName = &"interactable_door"
 const NIGHT_VISION_LOCKED_HINT_DURATION: float = 2.2
 const NIGHT_VISION_PROMPT_TEXT: String = "Gece gorusunu acmak icin F harfine basin"
+const CAMCORDER_REC_BLINK_HZ: float = 2.05
+const CAMCORDER_BATTERY_FILL_WIDTH: float = 86.0
 
 @export var mouse_sensitivity: float = 0.0018
 @export var walk_speed: float = 3.7
@@ -62,6 +64,7 @@ const NIGHT_VISION_PROMPT_TEXT: String = "Gece gorusunu acmak icin F harfine bas
 @export var night_vision_ir_shadow_enabled: bool = false
 @export var night_vision_unlock_prompt_duration: float = 10.0
 @export var prompt_scan_interval: float = 0.09
+@export var camcorder_hud_enabled: bool = true
 
 @onready var head: Node3D = $Head
 @onready var camera: Camera3D = $Head/Camera3D
@@ -102,6 +105,17 @@ var _night_vision_prompt_label: Label
 var _door_prompt_scan_left: float = 0.0
 var _nearby_door: InteractableDoor
 var _night_vision_prompt_time_left: float = 0.0
+var _camcorder_layer: CanvasLayer
+var _camcorder_rec_dot: ColorRect
+var _camcorder_rec_label: Label
+var _camcorder_time_label: Label
+var _camcorder_mode_label: Label
+var _camcorder_battery_fill: ColorRect
+var _camcorder_battery_label: Label
+var _camcorder_frame_lines: Array[ColorRect] = []
+var _camcorder_labels: Array[Label] = []
+var _camcorder_battery_level: float = 0.92
+var _camcorder_clock_time: float = 0.0
 
 func _ready() -> void:
 	_setup_default_input_map()
@@ -122,6 +136,7 @@ func _ready() -> void:
 	camera.position = _camera_base_pos
 	_build_night_vision_overlay()
 	_build_prompt_overlay()
+	_build_camcorder_hud()
 	_apply_night_vision_settings()
 	_night_vision_on = false
 	_night_vision_unlocked = false
@@ -170,6 +185,7 @@ func _physics_process(delta: float) -> void:
 		camera.fov = lerpf(camera.fov, walk_fov, minf(1.0, delta * fov_lerp_speed))
 		_update_night_vision_motion(delta)
 		_update_prompt_state(delta)
+		_update_camcorder_hud(delta)
 		return
 
 	var was_on_floor: bool = is_on_floor()
@@ -224,6 +240,7 @@ func _physics_process(delta: float) -> void:
 	_update_camera_effects(delta, input_dir)
 	_update_night_vision_motion(delta)
 	_update_prompt_state(delta)
+	_update_camcorder_hud(delta)
 
 func lock_controls(locked: bool) -> void:
 	_controls_locked = locked
@@ -342,10 +359,12 @@ func _build_night_vision_overlay() -> void:
 	_night_vision_overlay_material = ShaderMaterial.new()
 	_night_vision_overlay_material.shader = overlay_shader
 	_night_vision_overlay_material.set_shader_parameter("overlay_alpha", 0.9)
-	_night_vision_overlay_material.set_shader_parameter("gain", 2.25)
-	_night_vision_overlay_material.set_shader_parameter("grain_strength", 0.07)
-	_night_vision_overlay_material.set_shader_parameter("scanline_strength", 0.09)
-	_night_vision_overlay_material.set_shader_parameter("vignette_strength", 0.36)
+	_night_vision_overlay_material.set_shader_parameter("gain", 2.35)
+	_night_vision_overlay_material.set_shader_parameter("grain_strength", 0.095)
+	_night_vision_overlay_material.set_shader_parameter("scanline_strength", 0.14)
+	_night_vision_overlay_material.set_shader_parameter("vignette_strength", 0.42)
+	_night_vision_overlay_material.set_shader_parameter("horizontal_distortion", 0.0035)
+	_night_vision_overlay_material.set_shader_parameter("phosphor_trail", 0.28)
 	_night_vision_overlay_rect.material = _night_vision_overlay_material
 
 	_night_vision_label = Label.new()
@@ -418,6 +437,200 @@ func _build_prompt_overlay() -> void:
 	_night_vision_prompt_label.add_theme_font_size_override("font_size", 16)
 	_night_vision_prompt_label.add_theme_color_override("font_color", Color(0.82, 0.97, 0.86, 0.96))
 	_night_vision_prompt_bg.add_child(_night_vision_prompt_label)
+
+func _build_camcorder_hud() -> void:
+	if not camcorder_hud_enabled:
+		return
+
+	_camcorder_layer = CanvasLayer.new()
+	_camcorder_layer.layer = 62
+	add_child(_camcorder_layer)
+
+	var root: Control = Control.new()
+	root.anchor_left = 0.0
+	root.anchor_top = 0.0
+	root.anchor_right = 1.0
+	root.anchor_bottom = 1.0
+	root.offset_left = 0.0
+	root.offset_top = 0.0
+	root.offset_right = 0.0
+	root.offset_bottom = 0.0
+	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_camcorder_layer.add_child(root)
+
+	var frame_color: Color = Color(0.92, 0.95, 0.99, 0.34)
+	_camcorder_frame_lines.append(_create_camcorder_line(root, 0.0, 0.0, 0.0, 0.0, 22.0, 18.0, 96.0, 22.0, frame_color))
+	_camcorder_frame_lines.append(_create_camcorder_line(root, 0.0, 0.0, 0.0, 0.0, 22.0, 18.0, 26.0, 92.0, frame_color))
+	_camcorder_frame_lines.append(_create_camcorder_line(root, 1.0, 0.0, 1.0, 0.0, -96.0, 18.0, -22.0, 22.0, frame_color))
+	_camcorder_frame_lines.append(_create_camcorder_line(root, 1.0, 0.0, 1.0, 0.0, -26.0, 18.0, -22.0, 92.0, frame_color))
+	_camcorder_frame_lines.append(_create_camcorder_line(root, 0.0, 1.0, 0.0, 1.0, 22.0, -22.0, 96.0, -18.0, frame_color))
+	_camcorder_frame_lines.append(_create_camcorder_line(root, 0.0, 1.0, 0.0, 1.0, 22.0, -92.0, 26.0, -18.0, frame_color))
+	_camcorder_frame_lines.append(_create_camcorder_line(root, 1.0, 1.0, 1.0, 1.0, -96.0, -22.0, -22.0, -18.0, frame_color))
+	_camcorder_frame_lines.append(_create_camcorder_line(root, 1.0, 1.0, 1.0, 1.0, -26.0, -92.0, -22.0, -18.0, frame_color))
+
+	var center_h: ColorRect = _create_camcorder_line(root, 0.5, 0.5, 0.5, 0.5, -15.0, -1.0, 15.0, 1.0, Color(0.92, 0.95, 0.99, 0.2))
+	var center_v: ColorRect = _create_camcorder_line(root, 0.5, 0.5, 0.5, 0.5, -1.0, -15.0, 1.0, 15.0, Color(0.92, 0.95, 0.99, 0.2))
+	_camcorder_frame_lines.append(center_h)
+	_camcorder_frame_lines.append(center_v)
+
+	_camcorder_rec_dot = ColorRect.new()
+	_camcorder_rec_dot.anchor_left = 0.0
+	_camcorder_rec_dot.anchor_top = 0.0
+	_camcorder_rec_dot.anchor_right = 0.0
+	_camcorder_rec_dot.anchor_bottom = 0.0
+	_camcorder_rec_dot.offset_left = 26.0
+	_camcorder_rec_dot.offset_top = 24.0
+	_camcorder_rec_dot.offset_right = 36.0
+	_camcorder_rec_dot.offset_bottom = 34.0
+	_camcorder_rec_dot.color = Color(1.0, 0.14, 0.1, 1.0)
+	root.add_child(_camcorder_rec_dot)
+
+	_camcorder_rec_label = Label.new()
+	_camcorder_rec_label.anchor_left = 0.0
+	_camcorder_rec_label.anchor_top = 0.0
+	_camcorder_rec_label.anchor_right = 0.0
+	_camcorder_rec_label.anchor_bottom = 0.0
+	_camcorder_rec_label.offset_left = 44.0
+	_camcorder_rec_label.offset_top = 17.0
+	_camcorder_rec_label.offset_right = 260.0
+	_camcorder_rec_label.offset_bottom = 42.0
+	_camcorder_rec_label.text = "REC  1080P / 24FPS"
+	_camcorder_rec_label.add_theme_font_size_override("font_size", 15)
+	root.add_child(_camcorder_rec_label)
+	_camcorder_labels.append(_camcorder_rec_label)
+
+	_camcorder_time_label = Label.new()
+	_camcorder_time_label.anchor_left = 0.0
+	_camcorder_time_label.anchor_top = 1.0
+	_camcorder_time_label.anchor_right = 0.0
+	_camcorder_time_label.anchor_bottom = 1.0
+	_camcorder_time_label.offset_left = 26.0
+	_camcorder_time_label.offset_top = -56.0
+	_camcorder_time_label.offset_right = 300.0
+	_camcorder_time_label.offset_bottom = -28.0
+	_camcorder_time_label.text = "00:00:00"
+	_camcorder_time_label.add_theme_font_size_override("font_size", 17)
+	root.add_child(_camcorder_time_label)
+	_camcorder_labels.append(_camcorder_time_label)
+
+	_camcorder_mode_label = Label.new()
+	_camcorder_mode_label.anchor_left = 1.0
+	_camcorder_mode_label.anchor_top = 1.0
+	_camcorder_mode_label.anchor_right = 1.0
+	_camcorder_mode_label.anchor_bottom = 1.0
+	_camcorder_mode_label.offset_left = -330.0
+	_camcorder_mode_label.offset_top = -56.0
+	_camcorder_mode_label.offset_right = -26.0
+	_camcorder_mode_label.offset_bottom = -28.0
+	_camcorder_mode_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_camcorder_mode_label.text = "STD  AUTO  F2.8  1/60"
+	_camcorder_mode_label.add_theme_font_size_override("font_size", 14)
+	root.add_child(_camcorder_mode_label)
+	_camcorder_labels.append(_camcorder_mode_label)
+
+	var battery_bg: ColorRect = ColorRect.new()
+	battery_bg.anchor_left = 1.0
+	battery_bg.anchor_top = 0.0
+	battery_bg.anchor_right = 1.0
+	battery_bg.anchor_bottom = 0.0
+	battery_bg.offset_left = -132.0
+	battery_bg.offset_top = 18.0
+	battery_bg.offset_right = -30.0
+	battery_bg.offset_bottom = 40.0
+	battery_bg.color = Color(0.01, 0.01, 0.01, 0.5)
+	root.add_child(battery_bg)
+
+	_camcorder_battery_fill = ColorRect.new()
+	_camcorder_battery_fill.anchor_left = 0.0
+	_camcorder_battery_fill.anchor_top = 0.0
+	_camcorder_battery_fill.anchor_right = 0.0
+	_camcorder_battery_fill.anchor_bottom = 0.0
+	_camcorder_battery_fill.offset_left = 3.0
+	_camcorder_battery_fill.offset_top = 3.0
+	_camcorder_battery_fill.offset_right = 3.0 + CAMCORDER_BATTERY_FILL_WIDTH
+	_camcorder_battery_fill.offset_bottom = 19.0
+	_camcorder_battery_fill.color = Color(0.92, 0.95, 0.99, 0.9)
+	battery_bg.add_child(_camcorder_battery_fill)
+
+	_camcorder_battery_label = Label.new()
+	_camcorder_battery_label.anchor_left = 1.0
+	_camcorder_battery_label.anchor_top = 0.0
+	_camcorder_battery_label.anchor_right = 1.0
+	_camcorder_battery_label.anchor_bottom = 0.0
+	_camcorder_battery_label.offset_left = -196.0
+	_camcorder_battery_label.offset_top = 17.0
+	_camcorder_battery_label.offset_right = -138.0
+	_camcorder_battery_label.offset_bottom = 39.0
+	_camcorder_battery_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_camcorder_battery_label.text = "BAT"
+	_camcorder_battery_label.add_theme_font_size_override("font_size", 12)
+	root.add_child(_camcorder_battery_label)
+	_camcorder_labels.append(_camcorder_battery_label)
+
+func _create_camcorder_line(
+		parent: Control,
+		anchor_left_value: float,
+		anchor_top_value: float,
+		anchor_right_value: float,
+		anchor_bottom_value: float,
+		offset_left_value: float,
+		offset_top_value: float,
+		offset_right_value: float,
+		offset_bottom_value: float,
+		line_color: Color
+	) -> ColorRect:
+	var line: ColorRect = ColorRect.new()
+	line.anchor_left = anchor_left_value
+	line.anchor_top = anchor_top_value
+	line.anchor_right = anchor_right_value
+	line.anchor_bottom = anchor_bottom_value
+	line.offset_left = offset_left_value
+	line.offset_top = offset_top_value
+	line.offset_right = offset_right_value
+	line.offset_bottom = offset_bottom_value
+	line.color = line_color
+	line.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	parent.add_child(line)
+	return line
+
+func _update_camcorder_hud(delta: float) -> void:
+	if _camcorder_layer == null:
+		return
+
+	_camcorder_clock_time += delta
+	var blink_phase: float = fmod(_camcorder_clock_time * CAMCORDER_REC_BLINK_HZ, 1.0)
+	var blink_alpha: float = 1.0 if blink_phase < 0.58 else 0.22
+	if _camcorder_rec_dot != null:
+		_camcorder_rec_dot.color = Color(1.0, 0.14, 0.1, blink_alpha)
+
+	if _night_vision_on:
+		_camcorder_battery_level = maxf(0.14, _camcorder_battery_level - delta * 0.0026)
+	else:
+		_camcorder_battery_level = minf(1.0, _camcorder_battery_level + delta * 0.0014)
+
+	if _camcorder_battery_fill != null:
+		_camcorder_battery_fill.offset_right = 3.0 + CAMCORDER_BATTERY_FILL_WIDTH * _camcorder_battery_level
+		var battery_color: Color = Color(0.9, 0.16, 0.14, 0.95) if _camcorder_battery_level < 0.2 else Color(0.72, 1.0, 0.76, 0.92) if _night_vision_on else Color(0.92, 0.95, 0.99, 0.9)
+		_camcorder_battery_fill.color = battery_color
+
+	var total_seconds: int = int(_camcorder_clock_time)
+	var hours: int = (total_seconds / 3600) % 24
+	var minutes: int = (total_seconds / 60) % 60
+	var seconds: int = total_seconds % 60
+	if _camcorder_time_label != null:
+		_camcorder_time_label.text = "%02d:%02d:%02d" % [hours, minutes, seconds]
+	if _camcorder_mode_label != null:
+		_camcorder_mode_label.text = "NV ON  AUTO  F2.8  1/60" if _night_vision_on else "STD  AUTO  F2.8  1/60"
+
+	var hud_tint: Color = Color(0.64, 1.0, 0.68, 0.96) if _night_vision_on else Color(0.92, 0.95, 0.99, 0.9)
+	for i in range(_camcorder_labels.size()):
+		var label: Label = _camcorder_labels[i]
+		if label != null:
+			label.modulate = hud_tint
+	for i in range(_camcorder_frame_lines.size()):
+		var line: ColorRect = _camcorder_frame_lines[i]
+		if line != null:
+			line.color = Color(hud_tint.r, hud_tint.g, hud_tint.b, 0.34)
 
 func _update_prompt_state(delta: float) -> void:
 	if _night_vision_prompt_time_left > 0.0:

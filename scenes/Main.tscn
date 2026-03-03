@@ -22,16 +22,16 @@ sky_material = SubResource("ShaderMaterial_night_sky")
 background_mode = 2
 sky = SubResource("Sky_4hgrx")
 ambient_light_source = 3
-ambient_light_color = Color(0.1, 0.12, 0.18, 1)
-ambient_light_energy = 0.2
+ambient_light_color = Color(0.12, 0.15, 0.22, 1)
+ambient_light_energy = 0.28
 fog_enabled = true
-fog_light_energy = 0.19
-fog_density = 0.014
+fog_light_energy = 0.25
+fog_density = 0.0115
 volumetric_fog_enabled = true
-volumetric_fog_density = 0.018
+volumetric_fog_density = 0.014
 adjustment_enabled = true
-adjustment_brightness = 0.76
-adjustment_contrast = 1.1
+adjustment_brightness = 0.88
+adjustment_contrast = 1.07
 
 [node name="Main" type="Node3D"]
 script = ExtResource("5_quality")
@@ -73,20 +73,20 @@ village_path = NodePath("../Village")
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
 transform = Transform3D(0.965926, -0.258819, 0, 0.183013, 0.683013, -0.707107, 0.183013, 0.683013, 0.707107, 0, 9, 0)
-light_energy = 0.15
-light_color = Color(0.44, 0.53, 0.74, 1)
+light_energy = 0.2
+light_color = Color(0.5, 0.58, 0.78, 1)
 shadow_enabled = true
 shadow_blur = 2.0
 
 [node name="CinematicPostFX" type="Node" parent="."]
 script = ExtResource("10_postfx")
 grain_strength = 0.022
-vignette_strength = 0.3
+vignette_strength = 0.24
 chromatic_aberration = 0.0011
-contrast = 1.06
-saturation = 0.95
-blue_tint_strength = 0.08
-shadow_crush = 0.03
+contrast = 1.03
+saturation = 0.98
+blue_tint_strength = 0.05
+shadow_crush = 0.0
 
 [node name="StartupIntro" type="Node" parent="."]
 script = ExtResource("11_intro")
