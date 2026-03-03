@@ -26,6 +26,9 @@ enum SequenceState {
 @export var third_person_look_height: float = 1.1
 @export var third_person_follow_lerp: float = 6.0
 @export var third_person_fov: float = 78.0
+@export var drive_first_person_fov: float = 92.0
+@export var settle_first_person_fov: float = 89.0
+@export var driver_door_open_on_exit: bool = true
 @export var camera_shake_drive: float = 0.06
 @export var camera_shake_stall: float = 0.12
 @export var enable_refuel_objective: bool = false
@@ -85,6 +88,7 @@ func _ready() -> void:
 
 	_player.call("lock_controls", true)
 	_player.call("set_has_fuel", false)
+	_set_driver_door_open(false)
 	_snap_player_to_seat(deg_to_rad(-3.0), deg_to_rad(1.0), Vector3(0.01, -0.02, 0.02))
 	_setup_intro_camera()
 
@@ -118,6 +122,8 @@ func _update_drive(delta: float) -> void:
 	var roll: float = deg_to_rad(road_vibration * 15.0)
 	var offset: Vector3 = Vector3(0.01, -0.02 + road_vibration, 0.02)
 	_snap_player_to_seat(pitch, roll, offset)
+	if not third_person_camera_enabled:
+		_apply_first_person_drive_fov(drive_first_person_fov, delta)
 	_update_cinematic_camera(delta, camera_shake_drive)
 
 	if alpha >= 1.0:
@@ -136,6 +142,8 @@ func _update_stall(delta: float) -> void:
 	var roll: float = deg_to_rad(sputter * 1.8)
 	var offset: Vector3 = Vector3(sputter * 0.004, -0.04 + absf(sputter) * 0.004, 0.035)
 	_snap_player_to_seat(pitch, roll, offset)
+	if not third_person_camera_enabled:
+		_apply_first_person_drive_fov(lerpf(drive_first_person_fov + 1.4, drive_first_person_fov - 0.8, t), delta)
 	_update_cinematic_camera(delta, lerpf(camera_shake_stall, camera_shake_stall * 0.45, t))
 
 	if t >= 1.0:
@@ -153,6 +161,8 @@ func _update_settle(delta: float) -> void:
 	var roll: float = lerpf(deg_to_rad(1.4), 0.0, eased)
 	var offset: Vector3 = Vector3(0.0, lerpf(-0.03, 0.0, eased), lerpf(0.03, 0.0, eased))
 	_snap_player_to_seat(pitch, roll, offset)
+	if not third_person_camera_enabled:
+		_apply_first_person_drive_fov(lerpf(drive_first_person_fov - 0.6, settle_first_person_fov, eased), delta)
 	_update_cinematic_camera(delta, lerpf(camera_shake_stall * 0.35, 0.0, eased))
 
 	if alpha >= 1.0:
@@ -162,6 +172,9 @@ func _finish_cinematic() -> void:
 	_car.global_transform = _car_stop_end
 	_disable_intro_camera()
 	_set_steam_emitting(false)
+	if driver_door_open_on_exit:
+		_set_driver_door_open(true)
+	_apply_first_person_drive_fov(settle_first_person_fov)
 	if _engine_bg != null:
 		_engine_bg.visible = false
 	_player.call("place_player", _exit_marker.global_transform)
@@ -193,6 +206,7 @@ func _update_gameplay() -> void:
 	if distance_to_refuel <= 2.6 and Input.is_action_just_pressed("interact"):
 		_player.call("consume_fuel")
 		_player.call("lock_controls", true)
+		_set_driver_door_open(false)
 		_set_objective("Motor yeniden calistiriliyor...")
 		_state = SequenceState.RESTART
 		_state_time = 0.0
@@ -208,11 +222,16 @@ func _update_restart(delta: float) -> void:
 	var roll: float = deg_to_rad(crank * 0.9)
 	var offset: Vector3 = Vector3(crank * 0.002, -0.015 + absf(crank) * 0.002, 0.01)
 	_snap_player_to_seat(pitch, roll, offset)
+	if not third_person_camera_enabled:
+		_apply_first_person_drive_fov(lerpf(settle_first_person_fov, drive_first_person_fov - 1.2, 1.0 - alpha), delta)
 	_update_cinematic_camera(delta, 0.0)
 
 	if alpha >= 1.0:
+		if driver_door_open_on_exit:
+			_set_driver_door_open(true)
 		_player.call("place_player", _exit_marker.global_transform)
 		_player.call("reset_head_camera_pose")
+		_apply_first_person_drive_fov(settle_first_person_fov)
 		_set_first_person_camera_active(true)
 		_player.call("lock_controls", false)
 		if _player.has_method("unlock_night_vision_controls"):
@@ -348,6 +367,19 @@ func _set_first_person_camera_active(active: bool) -> void:
 		_player.call("set_first_person_active", active)
 	elif _player_camera != null:
 		_player_camera.current = active
+
+func _apply_first_person_drive_fov(target_fov: float, delta: float = 0.0) -> void:
+	if _player_camera == null:
+		return
+	if delta <= 0.0:
+		_player_camera.fov = target_fov
+		return
+	var alpha: float = minf(1.0, delta * 6.0)
+	_player_camera.fov = lerpf(_player_camera.fov, target_fov, alpha)
+
+func _set_driver_door_open(opened: bool) -> void:
+	if _car != null and _car.has_method("set_driver_door_open"):
+		_car.call("set_driver_door_open", opened)
 
 func _update_cinematic_camera(delta: float, shake_amount: float) -> void:
 	if _cinematic_camera == null or _car == null:

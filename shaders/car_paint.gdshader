@@ -3,9 +3,10 @@ render_mode cull_back, diffuse_burley, specular_schlick_ggx;
 
 uniform vec3 base_color : source_color = vec3(0.13, 0.13, 0.14);
 uniform vec3 flake_tint : source_color = vec3(0.34, 0.36, 0.40);
-uniform float flake_density = 180.0;
+uniform float flake_density = 150.0;
+uniform float flake_intensity = 0.24;
 uniform float clearcoat_strength = 0.92;
-uniform float rain_streak_strength = 0.16;
+uniform float wetness = 0.28;
 
 float hash12(vec2 p) {
 	vec3 p3 = fract(vec3(p.xyx) * 0.1031);
@@ -16,14 +17,17 @@ float hash12(vec2 p) {
 void fragment() {
 	vec2 uv = UV * flake_density;
 	float flakes = hash12(floor(uv));
-	float rain = sin((UV.y * 50.0) + TIME * 8.0 + UV.x * 7.0) * 0.5 + 0.5;
-	float streak = smoothstep(0.68, 1.0, rain) * rain_streak_strength;
+	float flake_mask = smoothstep(0.81, 1.0, flakes);
+	float fresnel = pow(1.0 - clamp(dot(normalize(NORMAL), normalize(VIEW)), 0.0, 1.0), 3.2);
 
-	vec3 paint = mix(base_color, flake_tint, smoothstep(0.82, 1.0, flakes) * 0.22);
-	paint = mix(paint, paint * 0.75, streak);
+	vec3 paint = base_color;
+	paint += flake_tint * flake_mask * flake_intensity;
+	paint = mix(paint, paint * 0.82, wetness * 0.24);
 
 	ALBEDO = paint;
-	METALLIC = 0.88;
-	ROUGHNESS = clamp(0.25 - streak * 0.16, 0.06, 0.32);
-	SPECULAR = clearcoat_strength;
+	METALLIC = 0.93;
+	ROUGHNESS = clamp(0.23 - flake_mask * 0.05 - fresnel * 0.08 - wetness * 0.09, 0.045, 0.32);
+	SPECULAR = clamp(clearcoat_strength + fresnel * 0.14, 0.0, 1.0);
+	RIM = fresnel * (0.05 + wetness * 0.08);
+	RIM_TINT = 0.34;
 }

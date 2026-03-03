@@ -15,6 +15,9 @@ extends Node3D
 @export var trunk_hinge_path: NodePath = NodePath("StoryTrunkHinge")
 @export var trunk_open_angle_deg: float = 56.0
 @export var trunk_open_duration: float = 0.52
+@export var driver_door_hinge_path: NodePath = NodePath("FallbackVisual/DriverDoorHinge")
+@export var driver_door_open_angle_deg: float = 62.0
+@export var driver_door_open_duration: float = 0.4
 
 var _model_root: Node3D
 var _fallback_visual: Node3D
@@ -24,6 +27,10 @@ var _trunk_hinge: Node3D
 var _trunk_tween: Tween
 var _trunk_closed_rotation_x: float = 0.0
 var _trunk_open: bool = false
+var _driver_door_hinge: Node3D
+var _driver_door_tween: Tween
+var _driver_door_closed_rotation_y: float = 0.0
+var _driver_door_open: bool = false
 var _texture_cache: Dictionary = {}
 var _missing_texture_files: Dictionary = {}
 var _imported_texture_path_cache: Dictionary = {}
@@ -33,6 +40,7 @@ func _ready() -> void:
 	_fallback_visual = get_node_or_null(fallback_visual_path) as Node3D
 	_collision_shape = get_node_or_null(collision_shape_path) as CollisionShape3D
 	_cache_trunk_hinge()
+	_cache_driver_door_hinge()
 	if _model_root == null:
 		return
 
@@ -77,12 +85,46 @@ func toggle_trunk() -> void:
 func is_trunk_open() -> bool:
 	return _trunk_open
 
+func set_driver_door_open(opened: bool) -> void:
+	_cache_driver_door_hinge()
+	if _driver_door_hinge == null:
+		return
+
+	if _driver_door_open == opened and (_driver_door_tween == null or not _driver_door_tween.is_running()):
+		return
+	_driver_door_open = opened
+
+	if _driver_door_tween != null and _driver_door_tween.is_running():
+		_driver_door_tween.kill()
+
+	var target_y: float = _driver_door_closed_rotation_y
+	if opened:
+		target_y += deg_to_rad(absf(driver_door_open_angle_deg))
+
+	_driver_door_tween = create_tween()
+	_driver_door_tween.set_trans(Tween.TRANS_SINE)
+	_driver_door_tween.set_ease(Tween.EASE_IN_OUT)
+	_driver_door_tween.tween_property(_driver_door_hinge, "rotation:y", target_y, maxf(0.01, driver_door_open_duration))
+
+func toggle_driver_door() -> void:
+	set_driver_door_open(not _driver_door_open)
+
+func is_driver_door_open() -> bool:
+	return _driver_door_open
+
 func _cache_trunk_hinge() -> void:
 	if _trunk_hinge != null:
 		return
 	_trunk_hinge = get_node_or_null(trunk_hinge_path) as Node3D
 	if _trunk_hinge != null:
 		_trunk_closed_rotation_x = _trunk_hinge.rotation.x
+
+func _cache_driver_door_hinge() -> void:
+	if _driver_door_hinge != null:
+		return
+	_driver_door_hinge = get_node_or_null(driver_door_hinge_path) as Node3D
+	if _driver_door_hinge != null:
+		_driver_door_closed_rotation_y = _driver_door_hinge.rotation.y
 
 func _try_spawn_external_model() -> Node3D:
 	var candidate_paths: PackedStringArray = _build_candidate_paths()

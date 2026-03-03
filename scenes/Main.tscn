@@ -58,6 +58,7 @@ car_path = NodePath("../CrashCar")
 seat_marker_path = NodePath("../CrashCar/SeatMarker")
 exit_marker_path = NodePath("../CrashCar/ExitMarker")
 refuel_point_path = NodePath("../CrashCar/RefuelPoint")
+third_person_camera_enabled = false
 
 [node name="HorrorDirector" type="Node" parent="."]
 script = ExtResource("9_horror")
