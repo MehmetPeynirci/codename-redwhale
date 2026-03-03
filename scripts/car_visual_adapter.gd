@@ -88,6 +88,8 @@ func _try_spawn_external_model() -> Node3D:
 	var candidate_paths: PackedStringArray = _build_candidate_paths()
 	for path_variant in candidate_paths:
 		var path: String = str(path_variant)
+		if path.strip_edges() == "":
+			continue
 		if not ResourceLoader.exists(path):
 			continue
 		var res: Resource = load(path)
@@ -104,42 +106,13 @@ func _build_candidate_paths() -> PackedStringArray:
 	var seen: Dictionary = {}
 	for raw_path in model_scene_candidates:
 		var path: String = str(raw_path)
-		if seen.has(path):
+		if path.strip_edges() == "":
 			continue
-		seen[path] = true
-		ordered.append(path)
-
-	for imported_path in _discover_imported_scene_paths():
-		var path: String = str(imported_path)
 		if seen.has(path):
 			continue
 		seen[path] = true
 		ordered.append(path)
 	return ordered
-
-func _discover_imported_scene_paths() -> PackedStringArray:
-	var result: PackedStringArray = PackedStringArray()
-	var dir: DirAccess = DirAccess.open("res://.godot/imported")
-	if dir == null:
-		return result
-
-	dir.list_dir_begin()
-	while true:
-		var entry: String = dir.get_next()
-		if entry == "":
-			break
-		if dir.current_is_dir():
-			continue
-
-		var lower: String = entry.to_lower()
-		if lower.begins_with("nexia done.fbx-") and (lower.ends_with(".scn") or lower.ends_with(".tscn") or lower.ends_with(".res")):
-			result.append("res://.godot/imported/" + entry)
-		elif lower.begins_with("nexia done.glb-") and (lower.ends_with(".scn") or lower.ends_with(".tscn") or lower.ends_with(".res")):
-			result.append("res://.godot/imported/" + entry)
-		elif lower.begins_with("nexia done.gltf-") and (lower.ends_with(".scn") or lower.ends_with(".tscn") or lower.ends_with(".res")):
-			result.append("res://.godot/imported/" + entry)
-	dir.list_dir_end()
-	return result
 
 func _spawn_from_resource(res: Resource) -> Node3D:
 	if res is PackedScene:
@@ -285,29 +258,22 @@ func _load_tex(file_name: String) -> Texture2D:
 		_missing_texture_files[clean_name] = true
 		return null
 
+	var bytes: PackedByteArray = FileAccess.get_file_as_bytes(path)
+	if not bytes.is_empty():
+		var image: Image = Image.new()
+		var image_err: int = _load_image_from_buffer(image, bytes, path.get_extension().to_lower())
+		if image_err == OK:
+			var tex_from_image: ImageTexture = ImageTexture.create_from_image(image)
+			_texture_cache[clean_name] = tex_from_image
+			return tex_from_image
+
+	# Fallback to imported texture only if direct decoding fails.
 	var imported_path: String = _resolve_imported_texture_path(path)
 	if imported_path != "" and ResourceLoader.exists(imported_path):
 		var imported_tex: Texture2D = ResourceLoader.load(imported_path) as Texture2D
 		if imported_tex != null:
 			_texture_cache[clean_name] = imported_tex
 			return imported_tex
-
-	var ext: String = path.get_extension().to_lower()
-	if ext == "png" or ext == "jpg" or ext == "jpeg" or ext == "webp":
-		var bytes: PackedByteArray = FileAccess.get_file_as_bytes(path)
-		if not bytes.is_empty():
-			var image: Image = Image.new()
-			var image_err: int = _load_image_from_buffer(image, bytes, ext)
-			if image_err == OK:
-				var tex_from_image: ImageTexture = ImageTexture.create_from_image(image)
-				_texture_cache[clean_name] = tex_from_image
-				return tex_from_image
-
-	if ResourceLoader.exists(path):
-		var loaded: Texture2D = ResourceLoader.load(path) as Texture2D
-		if loaded != null:
-			_texture_cache[clean_name] = loaded
-			return loaded
 
 	_missing_texture_files[clean_name] = true
 	return null
@@ -337,14 +303,29 @@ func _resolve_imported_texture_path(source_path: String) -> String:
 	_imported_texture_path_cache[source_path] = remap_path
 	return remap_path
 
-func _load_image_from_buffer(image: Image, bytes: PackedByteArray, ext: String) -> int:
-	if ext == "png":
+func _load_image_from_buffer(image: Image, bytes: PackedByteArray, ext_hint: String) -> int:
+	var format: String = _detect_image_format(bytes)
+	if format == "":
+		format = ext_hint
+	if format == "png":
 		return image.load_png_from_buffer(bytes)
-	if ext == "jpg" or ext == "jpeg":
+	if format == "jpg" or format == "jpeg":
 		return image.load_jpg_from_buffer(bytes)
-	if ext == "webp":
+	if format == "webp":
 		return image.load_webp_from_buffer(bytes)
 	return ERR_UNAVAILABLE
+
+func _detect_image_format(bytes: PackedByteArray) -> String:
+	if bytes.size() >= 8:
+		if bytes[0] == 0x89 and bytes[1] == 0x50 and bytes[2] == 0x4E and bytes[3] == 0x47 and bytes[4] == 0x0D and bytes[5] == 0x0A and bytes[6] == 0x1A and bytes[7] == 0x0A:
+			return "png"
+	if bytes.size() >= 3:
+		if bytes[0] == 0xFF and bytes[1] == 0xD8 and bytes[2] == 0xFF:
+			return "jpg"
+	if bytes.size() >= 12:
+		if bytes[0] == 0x52 and bytes[1] == 0x49 and bytes[2] == 0x46 and bytes[3] == 0x46 and bytes[8] == 0x57 and bytes[9] == 0x45 and bytes[10] == 0x42 and bytes[11] == 0x50:
+			return "webp"
+	return ""
 
 func _choose_material_key(node_name: String) -> String:
 	if node_name.contains("wheel_panel"):
