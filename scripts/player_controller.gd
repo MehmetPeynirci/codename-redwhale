@@ -48,8 +48,8 @@ const NIGHT_VISION_PROMPT_TEXT: String = "Gece gorusu acmak icin F'ye basin"
 @export var landing_bump_strength: float = 0.08
 @export var landing_recover_speed: float = 10.0
 @export var camera_roll_sway_enabled: bool = true
-@export var camera_noise_strength: float = 0.0016
-@export var camera_noise_speed: float = 1.15
+@export var camera_noise_strength: float = 0.0019
+@export var camera_noise_speed: float = 1.28
 
 @export var injury_default_duration: float = 15.0
 @export var injury_speed_multiplier: float = 0.72
@@ -519,7 +519,9 @@ func _apply_headbob(delta: float) -> void:
 func _update_camera_effects(delta: float, input_dir: Vector2) -> void:
 	_landing_offset = lerpf(_landing_offset, 0.0, minf(1.0, landing_recover_speed * delta))
 	_mouse_sway = _mouse_sway.lerp(Vector2.ZERO, minf(1.0, 8.0 * delta))
-	_camera_noise_time += delta * camera_noise_speed
+	var horizontal_speed: float = Vector2(velocity.x, velocity.z).length()
+	var movement_noise_scale: float = 0.7 + clampf(horizontal_speed / maxf(walk_speed, 0.01), 0.0, 1.0) * 0.55
+	_camera_noise_time += delta * camera_noise_speed * movement_noise_scale
 
 	var target_fov: float = walk_fov
 	if _is_crouching:
@@ -528,11 +530,11 @@ func _update_camera_effects(delta: float, input_dir: Vector2) -> void:
 		target_fov = sprint_fov
 	camera.fov = lerpf(camera.fov, target_fov, minf(1.0, fov_lerp_speed * delta))
 
-	var camera_noise: Vector3 = Vector3(
-		sin(_camera_noise_time * 1.3) * camera_noise_strength,
-		cos(_camera_noise_time * 1.7) * camera_noise_strength * 1.1,
-		0.0
-	)
+	var noise_x: float = sin(_camera_noise_time * 1.3) * camera_noise_strength
+	noise_x += sin(_camera_noise_time * 2.75 + 0.65) * camera_noise_strength * 0.42
+	var noise_y: float = cos(_camera_noise_time * 1.65) * camera_noise_strength * 1.1
+	noise_y += sin(_camera_noise_time * 3.4 + 1.2) * camera_noise_strength * 0.32
+	var camera_noise: Vector3 = Vector3(noise_x, noise_y, 0.0)
 
 	if not camera_roll_sway_enabled:
 		camera.rotation = Vector3.ZERO
@@ -540,7 +542,8 @@ func _update_camera_effects(delta: float, input_dir: Vector2) -> void:
 		return
 
 	var limp_roll: float = sin(_injury_wobble_time * 7.0) * 0.035 if _is_injured_phase() else 0.0
-	var target_roll: float = -input_dir.x * camera_tilt_strength + _mouse_sway.x + limp_roll
+	var breathing_roll: float = sin(_camera_noise_time * 0.82) * camera_noise_strength * 5.5
+	var target_roll: float = -input_dir.x * camera_tilt_strength + _mouse_sway.x + limp_roll + breathing_roll
 	camera.rotation.z = lerpf(camera.rotation.z, target_roll, minf(1.0, 10.0 * delta))
 
 	var sway_offset: Vector3 = Vector3(_mouse_sway.x * 0.35, -_mouse_sway.y * 0.35, 0.0)

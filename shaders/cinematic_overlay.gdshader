@@ -8,6 +8,8 @@ uniform float vignette_strength : hint_range(0.0, 1.0) = 0.32;
 uniform float chromatic_aberration : hint_range(0.0, 0.004) = 0.0011;
 uniform float contrast : hint_range(0.8, 1.4) = 1.06;
 uniform float saturation : hint_range(0.7, 1.4) = 1.03;
+uniform float blue_tint_strength : hint_range(0.0, 0.4) = 0.08;
+uniform float shadow_crush : hint_range(0.0, 0.25) = 0.06;
 
 float hash12(vec2 p) {
 	vec3 p3 = fract(vec3(p.xyx) * 0.1031);
@@ -35,6 +37,10 @@ void fragment() {
 	float lum = dot(col, vec3(0.2126, 0.7152, 0.0722));
 	col = mix(vec3(lum), col, saturation);
 	col = (col - 0.5) * contrast + 0.5;
+	col = mix(col, col * vec3(0.9, 0.97, 1.1), blue_tint_strength);
+
+	float shadow_mask = clamp(1.0 - lum, 0.0, 1.0);
+	col -= vec3(shadow_crush * shadow_mask * shadow_mask);
 
 	float vignette = smoothstep(0.28, 0.92, dist);
 	col *= 1.0 - vignette * vignette_strength;

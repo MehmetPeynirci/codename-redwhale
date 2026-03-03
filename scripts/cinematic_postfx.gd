@@ -6,6 +6,8 @@ extends Node
 @export var chromatic_aberration: float = 0.0011
 @export var contrast: float = 1.06
 @export var saturation: float = 1.03
+@export var blue_tint_strength: float = 0.08
+@export var shadow_crush: float = 0.06
 
 var _overlay_material: ShaderMaterial
 
@@ -38,4 +40,6 @@ func _ready() -> void:
 	_overlay_material.set_shader_parameter("chromatic_aberration", chromatic_aberration)
 	_overlay_material.set_shader_parameter("contrast", contrast)
 	_overlay_material.set_shader_parameter("saturation", saturation)
+	_overlay_material.set_shader_parameter("blue_tint_strength", blue_tint_strength)
+	_overlay_material.set_shader_parameter("shadow_crush", shadow_crush)
 	rect.material = _overlay_material
