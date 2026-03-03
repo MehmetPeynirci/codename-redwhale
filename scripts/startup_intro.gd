@@ -8,10 +8,11 @@ const INTRO_CARDS: Array[String] = [
 	"Mehmet Peynirci\n(Game Development Team)"
 ]
 
-@export var fade_in_duration: float = 0.75
-@export var hold_duration: float = 1.55
-@export var fade_out_duration: float = 0.7
-@export var card_gap_duration: float = 0.15
+@export var fade_in_duration: float = 0.42
+@export var hold_duration: float = 0.85
+@export var fade_out_duration: float = 0.38
+@export var card_gap_duration: float = 0.06
+@export var intro_speed_multiplier: float = 1.3
 @export var overlay_color: Color = Color(0.0, 0.0, 0.0, 0.95)
 @export var music_volume_db: float = -15.0
 @export var allow_skip: bool = true
@@ -103,13 +104,19 @@ func _pause_world() -> void:
 	get_tree().paused = true
 
 func _play_sequence() -> void:
+	var speed_scale: float = maxf(0.35, intro_speed_multiplier)
+	var fade_in: float = fade_in_duration / speed_scale
+	var hold: float = hold_duration / speed_scale
+	var fade_out: float = fade_out_duration / speed_scale
+	var gap: float = card_gap_duration / speed_scale
+
 	_intro_tween = create_tween()
 	for card in INTRO_CARDS:
 		_intro_tween.tween_callback(_set_card_text.bind(card))
-		_intro_tween.tween_property(_label, "modulate:a", 1.0, fade_in_duration)
-		_intro_tween.tween_interval(hold_duration)
-		_intro_tween.tween_property(_label, "modulate:a", 0.0, fade_out_duration)
-		_intro_tween.tween_interval(card_gap_duration)
+		_intro_tween.tween_property(_label, "modulate:a", 1.0, fade_in)
+		_intro_tween.tween_interval(hold)
+		_intro_tween.tween_property(_label, "modulate:a", 0.0, fade_out)
+		_intro_tween.tween_interval(gap)
 	_intro_tween.tween_callback(_finish_intro)
 
 func _set_card_text(text: String) -> void:
@@ -141,14 +148,14 @@ func _complete_intro() -> void:
 	queue_free()
 
 func _build_intro_music_stream() -> AudioStreamWAV:
-	var sample_rate: int = 22050
-	var duration: float = 18.0
+	var sample_rate: int = 16000
+	var duration: float = 10.0
 	var sample_count: int = int(duration * float(sample_rate))
 	var pcm: PackedByteArray = PackedByteArray()
 	pcm.resize(sample_count * 2)
 
 	var roots: PackedFloat32Array = PackedFloat32Array([98.0, 110.0, 82.41, 92.5])
-	var chord_seconds: float = 4.5
+	var chord_seconds: float = 2.5
 
 	for i in range(sample_count):
 		var t: float = float(i) / float(sample_rate)
@@ -179,7 +186,7 @@ func _build_intro_music_stream() -> AudioStreamWAV:
 	wav.mix_rate = sample_rate
 	wav.stereo = false
 	wav.loop_mode = AudioStreamWAV.LOOP_FORWARD
-	wav.loop_begin = int(0.9 * sample_rate)
+	wav.loop_begin = int(0.6 * sample_rate)
 	wav.loop_end = sample_count - 1
 	wav.data = pcm
 	return wav
