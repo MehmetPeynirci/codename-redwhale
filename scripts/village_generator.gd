@@ -15,6 +15,16 @@ const HOUSE_DOOR_HANDLE_BASE_RADIUS: float = 0.022
 const HOUSE_DOOR_HANDLE_BASE_HEIGHT: float = 0.05
 const HOUSE_DOOR_HANDLE_BAR_SIZE: Vector3 = Vector3(0.22, 0.028, 0.028)
 const HOUSE_DOOR_HANDLE_BAR_POSITION: Vector3 = Vector3(0.11, 0.0, 0.01)
+const HOUSE_DOOR_PANEL_TRIM_SIZE: Vector3 = Vector3(0.62, 0.78, 0.014)
+const HOUSE_DOOR_PANEL_SIZE: Vector3 = Vector3(0.54, 0.7, 0.018)
+const HOUSE_DOOR_PANEL_TOP_POSITION: Vector3 = Vector3(0.71, 1.46, 0.042)
+const HOUSE_DOOR_PANEL_BOTTOM_POSITION: Vector3 = Vector3(0.71, 0.58, 0.042)
+const HOUSE_ROOF_PANEL_SIZE: Vector3 = Vector3(6.35, 0.15, 2.58)
+const HOUSE_ROOF_RIDGE_SIZE: Vector3 = Vector3(6.02, 0.11, 0.34)
+const HOUSE_ROOF_PANEL_Y: float = 3.16
+const HOUSE_ROOF_PANEL_Z: float = 1.24
+const HOUSE_ROOF_RIDGE_Y: float = 3.9
+const HOUSE_ROOF_SLOPE: float = 0.58
 const PBR_WALL_PREFIX: String = "res://assets/pbr/paintedplaster012/PaintedPlaster012_2K-JPG"
 const PBR_ROOF_PREFIX: String = "res://assets/pbr/roofingtiles014b/RoofingTiles014B_2K-JPG"
 const PBR_WOOD_PREFIX: String = "res://assets/pbr/wood039/Wood039_2K-JPG"
@@ -66,10 +76,15 @@ var _asphalt_mat: Material
 var _glass_shader_mat: Material
 var _foliage_mat: ShaderMaterial
 var _door_script: Script
+var _metal_mat: StandardMaterial3D
 
 var _tree_trunk_mat: StandardMaterial3D
 var _tree_leaf_mat: StandardMaterial3D
 var _rock_mat: StandardMaterial3D
+
+var _box_mesh_cache: Dictionary = {}
+var _box_shape_cache: Dictionary = {}
+var _door_handle_base_mesh: CylinderMesh
 
 var _terrain_noise_primary: FastNoiseLite
 var _terrain_noise_secondary: FastNoiseLite
@@ -90,6 +105,7 @@ func _ready() -> void:
 	randomize()
 	_configure_terrain_noise()
 	_build_materials()
+	_build_shared_meshes()
 	_create_ground()
 	_create_ruined_houses()
 	_create_graves()
@@ -111,9 +127,33 @@ func _configure_terrain_noise() -> void:
 
 func _build_materials() -> void:
 	_wall_mat = _create_pbr_material(PBR_WALL_PREFIX, Vector3(0.95, 0.95, 0.95), true)
-	_roof_mat = _create_pbr_material(PBR_ROOF_PREFIX, Vector3(0.82, 0.82, 0.82), true)
+	_roof_mat = _create_weathered_surface_material(
+		PBR_ROOF_PREFIX,
+		Vector2(0.84, 0.84),
+		Color(0.77, 0.78, 0.8),
+		Color(0.16, 0.2, 0.17),
+		Color(0.08, 0.09, 0.11),
+		0.38,
+		0.22,
+		0.9,
+		0.36,
+		0.72,
+		0.95
+	)
 	_wood_mat = _create_pbr_material(PBR_WOOD_PREFIX, Vector3(1.35, 1.35, 1.35), true)
-	_door_mat = _create_pbr_material(PBR_WOOD_PREFIX, Vector3(1.05, 1.05, 1.05), true)
+	_door_mat = _create_weathered_surface_material(
+		PBR_WOOD_PREFIX,
+		Vector2(1.12, 1.12),
+		Color(0.84, 0.79, 0.73),
+		Color(0.19, 0.24, 0.19),
+		Color(0.1, 0.1, 0.1),
+		0.16,
+		0.12,
+		0.78,
+		0.42,
+		0.58,
+		0.68
+	)
 	_grave_mat = _create_pbr_material(PBR_CONCRETE_PREFIX, Vector3(1.15, 1.15, 1.15), true)
 	_ground_shader_mat = _create_pbr_material(PBR_GROUND_PREFIX, Vector3(10.0, 1.0, 10.0), false)
 	_asphalt_mat = _create_pbr_material(PBR_ASPHALT_PREFIX, Vector3(4.0, 1.0, 4.0), false)
@@ -125,6 +165,12 @@ func _build_materials() -> void:
 	var roof_standard: StandardMaterial3D = _roof_mat as StandardMaterial3D
 	if roof_standard != null:
 		roof_standard.roughness = 0.95
+
+	_metal_mat = StandardMaterial3D.new()
+	_metal_mat.albedo_color = Color(0.58, 0.58, 0.6, 1.0)
+	_metal_mat.roughness = 0.28
+	_metal_mat.metallic = 0.92
+	_metal_mat.specular = 0.72
 
 	_glass_shader_mat = ShaderMaterial.new()
 	_glass_shader_mat.shader = load("res://shaders/broken_glass.gdshader")
@@ -149,6 +195,12 @@ func _build_materials() -> void:
 	_rock_mat.roughness = 0.95
 
 	_door_script = load("res://scripts/interactable_door.gd") as Script
+
+func _build_shared_meshes() -> void:
+	_door_handle_base_mesh = CylinderMesh.new()
+	_door_handle_base_mesh.top_radius = HOUSE_DOOR_HANDLE_BASE_RADIUS
+	_door_handle_base_mesh.bottom_radius = HOUSE_DOOR_HANDLE_BASE_RADIUS
+	_door_handle_base_mesh.height = HOUSE_DOOR_HANDLE_BASE_HEIGHT
 
 func _create_pbr_material(prefix: String, uv_scale: Vector3, use_triplanar: bool) -> StandardMaterial3D:
 	var mat: StandardMaterial3D = StandardMaterial3D.new()
@@ -178,6 +230,54 @@ func _create_pbr_material(prefix: String, uv_scale: Vector3, use_triplanar: bool
 		mat.ao_enabled = true
 		mat.ao_texture = ao_tex
 		mat.ao_light_affect = 0.4
+
+	return mat
+
+func _create_weathered_surface_material(
+		prefix: String,
+		uv_scale: Vector2,
+		base_color: Color,
+		moss_color: Color,
+		wet_dark_color: Color,
+		wetness: float,
+		moss_amount: float,
+		roughness_dry: float,
+		roughness_wet: float,
+		specular_wet: float,
+		normal_strength: float
+	) -> Material:
+	var shader: Shader = load("res://shaders/weathered_surface.gdshader") as Shader
+	if shader == null:
+		return _create_pbr_material(prefix, Vector3(uv_scale.x, 1.0, uv_scale.y), true)
+
+	var mat: ShaderMaterial = ShaderMaterial.new()
+	mat.shader = shader
+	mat.set_shader_parameter("uv_scale", uv_scale)
+	mat.set_shader_parameter("base_color", Vector3(base_color.r, base_color.g, base_color.b))
+	mat.set_shader_parameter("moss_color", Vector3(moss_color.r, moss_color.g, moss_color.b))
+	mat.set_shader_parameter("wet_dark_color", Vector3(wet_dark_color.r, wet_dark_color.g, wet_dark_color.b))
+	mat.set_shader_parameter("wetness", wetness)
+	mat.set_shader_parameter("moss_amount", moss_amount)
+	mat.set_shader_parameter("roughness_dry", roughness_dry)
+	mat.set_shader_parameter("roughness_wet", roughness_wet)
+	mat.set_shader_parameter("specular_wet", specular_wet)
+	mat.set_shader_parameter("normal_strength", normal_strength)
+
+	var albedo_tex: Texture2D = _load_texture_if_exists("%s_Color.jpg" % prefix)
+	var normal_tex: Texture2D = _load_texture_if_exists("%s_NormalGL.jpg" % prefix)
+	var roughness_tex: Texture2D = _load_texture_if_exists("%s_Roughness.jpg" % prefix)
+	var ao_tex: Texture2D = _load_texture_if_exists("%s_AmbientOcclusion.jpg" % prefix)
+	var has_pbr_textures: bool = albedo_tex != null and normal_tex != null and roughness_tex != null
+	mat.set_shader_parameter("use_pbr_textures", has_pbr_textures)
+	mat.set_shader_parameter("use_ao_texture", ao_tex != null)
+	if albedo_tex != null:
+		mat.set_shader_parameter("albedo_tex", albedo_tex)
+	if normal_tex != null:
+		mat.set_shader_parameter("normal_tex", normal_tex)
+	if roughness_tex != null:
+		mat.set_shader_parameter("roughness_tex", roughness_tex)
+	if ao_tex != null:
+		mat.set_shader_parameter("ao_tex", ao_tex)
 
 	return mat
 
@@ -375,8 +475,7 @@ func _create_ruined_house(index: int, origin: Vector3, y_rot: float) -> Node3D:
 	_add_box_segment(house, Vector3(2.1, h, t), Vector3(1.95, h * 0.5, 3.0), Vector3.ZERO, wall_material, true)
 	_add_box_segment(house, Vector3(1.8, 0.4, t), Vector3(0.0, 2.6, 3.0), Vector3.ZERO, wall_material, true)
 
-	_add_box_segment(house, Vector3(4.8, 0.15, 2.1), Vector3(-0.8, 2.9, -1.1), Vector3(0.16, 0.25, -0.1), _roof_mat, true)
-	_add_box_segment(house, Vector3(2.5, 0.15, 1.5), Vector3(1.5, 2.5, 1.0), Vector3(-0.1, -0.2, 0.1), _roof_mat, true)
+	_add_house_roof(house, index)
 
 	_add_box_segment(house, Vector3(1.56, 0.12, 0.12), Vector3(0.0, 2.36, 2.94), Vector3.ZERO, _wood_mat, false)
 	_add_box_segment(house, Vector3(1.56, 0.02, 0.12), Vector3(0.0, 0.01, 2.94), Vector3.ZERO, _wood_mat, false)
@@ -389,10 +488,33 @@ func _create_ruined_house(index: int, origin: Vector3, y_rot: float) -> Node3D:
 		door_hinge.add_to_group("story_locked_door")
 		if door_hinge.has_method("set_locked"):
 			door_hinge.call("set_locked", true)
-	if index == 2:
-		_add_box_segment(house, Vector3(1.8, 0.12, 1.4), Vector3(1.15, 1.96, -0.85), Vector3(0.55, -0.12, 0.18), _roof_mat, false)
 
 	return house
+
+func _add_house_roof(house: Node3D, house_index: int) -> void:
+	var roof_y_offset: float = randf_range(-0.03, 0.05)
+	_add_box_segment(
+		house,
+		HOUSE_ROOF_PANEL_SIZE,
+		Vector3(0.0, HOUSE_ROOF_PANEL_Y + roof_y_offset, -HOUSE_ROOF_PANEL_Z),
+		Vector3(-HOUSE_ROOF_SLOPE, 0.0, 0.0),
+		_roof_mat,
+		false
+	)
+	_add_box_segment(
+		house,
+		HOUSE_ROOF_PANEL_SIZE,
+		Vector3(0.0, HOUSE_ROOF_PANEL_Y + roof_y_offset, HOUSE_ROOF_PANEL_Z),
+		Vector3(HOUSE_ROOF_SLOPE, 0.0, 0.0),
+		_roof_mat,
+		false
+	)
+	_add_box_segment(house, HOUSE_ROOF_RIDGE_SIZE, Vector3(0.0, HOUSE_ROOF_RIDGE_Y + roof_y_offset, 0.0), Vector3.ZERO, _roof_mat, false)
+
+	if house_index % 2 == 0:
+		_add_box_segment(house, Vector3(1.42, 0.08, 1.02), Vector3(1.78, 3.05, -0.94), Vector3(0.42, 0.14, 0.2), _roof_mat, false)
+	if house_index == 2:
+		_add_box_segment(house, Vector3(1.72, 0.09, 1.22), Vector3(1.12, 2.86, -0.86), Vector3(0.56, -0.12, 0.18), _roof_mat, false)
 
 func _add_house_door(house: Node3D) -> Node3D:
 	var hinge: Node3D = Node3D.new()
@@ -406,6 +528,8 @@ func _add_house_door(house: Node3D) -> Node3D:
 
 	var door_mesh: MeshInstance3D = _create_house_door_mesh()
 	door_body.add_child(door_mesh)
+	door_body.add_child(_create_house_door_panel(HOUSE_DOOR_PANEL_TOP_POSITION))
+	door_body.add_child(_create_house_door_panel(HOUSE_DOOR_PANEL_BOTTOM_POSITION))
 	door_body.add_child(_create_house_door_collision())
 	door_body.add_child(_create_house_door_handle())
 
@@ -426,18 +550,31 @@ func _configure_house_door_interaction(hinge: Node3D) -> void:
 
 func _create_house_door_mesh() -> MeshInstance3D:
 	var door_mesh: MeshInstance3D = MeshInstance3D.new()
-	var door_shape: BoxMesh = BoxMesh.new()
-	door_shape.size = HOUSE_DOOR_MESH_SIZE
-	door_mesh.mesh = door_shape
+	door_mesh.mesh = _get_cached_box_mesh(HOUSE_DOOR_MESH_SIZE)
 	door_mesh.material_override = _door_mat
 	door_mesh.position = HOUSE_DOOR_MESH_POSITION
 	return door_mesh
 
+func _create_house_door_panel(local_position: Vector3) -> Node3D:
+	var panel_root: Node3D = Node3D.new()
+	panel_root.position = local_position
+
+	var trim: MeshInstance3D = MeshInstance3D.new()
+	trim.mesh = _get_cached_box_mesh(HOUSE_DOOR_PANEL_TRIM_SIZE)
+	trim.material_override = _wood_mat
+	panel_root.add_child(trim)
+
+	var inset: MeshInstance3D = MeshInstance3D.new()
+	inset.mesh = _get_cached_box_mesh(HOUSE_DOOR_PANEL_SIZE)
+	inset.position = Vector3(0.0, 0.0, 0.01)
+	inset.material_override = _door_mat
+	panel_root.add_child(inset)
+
+	return panel_root
+
 func _create_house_door_collision() -> CollisionShape3D:
 	var collision: CollisionShape3D = CollisionShape3D.new()
-	var box: BoxShape3D = BoxShape3D.new()
-	box.size = HOUSE_DOOR_COLLISION_SIZE
-	collision.shape = box
+	collision.shape = _get_cached_box_shape(HOUSE_DOOR_COLLISION_SIZE)
 	collision.position = Vector3(HOUSE_DOOR_MESH_POSITION.x, HOUSE_DOOR_COLLISION_POSITION_Y, HOUSE_DOOR_MESH_POSITION.z)
 	return collision
 
@@ -447,20 +584,14 @@ func _create_house_door_handle() -> Node3D:
 	handle_pivot.position = HOUSE_DOOR_HANDLE_POSITION
 
 	var handle_base: MeshInstance3D = MeshInstance3D.new()
-	var base_mesh: CylinderMesh = CylinderMesh.new()
-	base_mesh.top_radius = HOUSE_DOOR_HANDLE_BASE_RADIUS
-	base_mesh.bottom_radius = HOUSE_DOOR_HANDLE_BASE_RADIUS
-	base_mesh.height = HOUSE_DOOR_HANDLE_BASE_HEIGHT
-	handle_base.mesh = base_mesh
-	handle_base.material_override = _wood_mat
+	handle_base.mesh = _door_handle_base_mesh
+	handle_base.material_override = _metal_mat
 	handle_base.rotation_degrees = Vector3(90.0, 0.0, 0.0)
 	handle_pivot.add_child(handle_base)
 
 	var handle_bar: MeshInstance3D = MeshInstance3D.new()
-	var bar_mesh: BoxMesh = BoxMesh.new()
-	bar_mesh.size = HOUSE_DOOR_HANDLE_BAR_SIZE
-	handle_bar.mesh = bar_mesh
-	handle_bar.material_override = _wood_mat
+	handle_bar.mesh = _get_cached_box_mesh(HOUSE_DOOR_HANDLE_BAR_SIZE)
+	handle_bar.material_override = _metal_mat
 	handle_bar.position = HOUSE_DOOR_HANDLE_BAR_POSITION
 	handle_pivot.add_child(handle_bar)
 	return handle_pivot
@@ -1059,9 +1190,7 @@ func _extract_mesh_from_scene(node: Node) -> Mesh:
 
 func _add_box_segment(parent: Node3D, size: Vector3, pos: Vector3, rot: Vector3, mat: Material, add_collision: bool) -> void:
 	var mesh_instance: MeshInstance3D = MeshInstance3D.new()
-	var mesh: BoxMesh = BoxMesh.new()
-	mesh.size = size
-	mesh_instance.mesh = mesh
+	mesh_instance.mesh = _get_cached_box_mesh(size)
 	mesh_instance.position = pos
 	mesh_instance.rotation = rot
 	mesh_instance.material_override = mat
@@ -1070,10 +1199,31 @@ func _add_box_segment(parent: Node3D, size: Vector3, pos: Vector3, rot: Vector3,
 	if add_collision:
 		var body: StaticBody3D = StaticBody3D.new()
 		var shape: CollisionShape3D = CollisionShape3D.new()
-		var box: BoxShape3D = BoxShape3D.new()
-		box.size = size
-		shape.shape = box
+		shape.shape = _get_cached_box_shape(size)
 		shape.position = pos
 		shape.rotation = rot
 		body.add_child(shape)
 		parent.add_child(body)
+
+func _get_cached_box_mesh(size: Vector3) -> BoxMesh:
+	var key: String = _box_cache_key(size)
+	if _box_mesh_cache.has(key):
+		return _box_mesh_cache[key] as BoxMesh
+
+	var box_mesh: BoxMesh = BoxMesh.new()
+	box_mesh.size = size
+	_box_mesh_cache[key] = box_mesh
+	return box_mesh
+
+func _get_cached_box_shape(size: Vector3) -> BoxShape3D:
+	var key: String = _box_cache_key(size)
+	if _box_shape_cache.has(key):
+		return _box_shape_cache[key] as BoxShape3D
+
+	var box_shape: BoxShape3D = BoxShape3D.new()
+	box_shape.size = size
+	_box_shape_cache[key] = box_shape
+	return box_shape
+
+func _box_cache_key(size: Vector3) -> String:
+	return "%.4f|%.4f|%.4f" % [size.x, size.y, size.z]
