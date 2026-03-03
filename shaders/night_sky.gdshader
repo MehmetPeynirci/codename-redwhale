@@ -1,7 +1,7 @@
 shader_type sky;
 
-uniform vec3 zenith_color : source_color = vec3(0.007, 0.011, 0.03);
-uniform vec3 horizon_color : source_color = vec3(0.018, 0.028, 0.058);
+uniform vec3 zenith_color : source_color = vec3(0.01, 0.015, 0.037);
+uniform vec3 horizon_color : source_color = vec3(0.024, 0.036, 0.069);
 uniform vec3 moon_color : source_color = vec3(0.82, 0.88, 0.98);
 uniform vec3 moon_direction = vec3(-0.56, 0.23, -0.8);
 uniform float moon_size : hint_range(0.01, 0.12) = 0.045;
@@ -9,7 +9,7 @@ uniform float moon_glow : hint_range(0.0, 2.0) = 0.58;
 uniform float star_density : hint_range(200.0, 2400.0) = 1450.0;
 uniform float star_intensity : hint_range(0.0, 2.0) = 1.02;
 uniform float twinkle_speed : hint_range(0.0, 8.0) = 1.8;
-uniform float sky_exposure : hint_range(0.2, 2.0) = 0.82;
+uniform float sky_exposure : hint_range(0.2, 2.0) = 0.94;
 
 float hash12(vec2 p) {
 	vec3 p3 = fract(vec3(p.xyx) * 0.1031);

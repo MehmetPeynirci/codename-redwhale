@@ -113,38 +113,38 @@ position = Vector3(0.72, 0.6, 1.92)
 position = Vector3(-0.72, 0.74, -2.02)
 rotation = Vector3(-0.03, 0, 0)
 light_color = Color(1, 0.97, 0.92, 1)
-light_energy = 7.1
-light_specular = 0.45
+light_energy = 11.5
+light_specular = 0.6
 shadow_enabled = true
 shadow_bias = 0.05
 shadow_normal_bias = 1.1
-spot_range = 27.0
-spot_attenuation = 1.06
-spot_angle = 37.0
+spot_range = 36.0
+spot_attenuation = 0.92
+spot_angle = 41.0
 
 [node name="HeadlightRight" type="SpotLight3D" parent="Headlights"]
 position = Vector3(0.72, 0.74, -2.02)
 rotation = Vector3(-0.03, 0, 0)
 light_color = Color(1, 0.97, 0.92, 1)
-light_energy = 7.1
-light_specular = 0.45
+light_energy = 11.5
+light_specular = 0.6
 shadow_enabled = true
 shadow_bias = 0.05
 shadow_normal_bias = 1.1
-spot_range = 27.0
-spot_attenuation = 1.06
-spot_angle = 37.0
+spot_range = 36.0
+spot_attenuation = 0.92
+spot_angle = 41.0
 
 [node name="HeadlightGlowLeft" type="OmniLight3D" parent="Headlights"]
 position = Vector3(-0.72, 0.74, -1.93)
 light_color = Color(1, 0.96, 0.9, 1)
-light_energy = 0.82
-omni_range = 2.5
-omni_attenuation = 1.8
+light_energy = 1.35
+omni_range = 3.6
+omni_attenuation = 1.5
 
 [node name="HeadlightGlowRight" type="OmniLight3D" parent="Headlights"]
 position = Vector3(0.72, 0.74, -1.93)
 light_color = Color(1, 0.96, 0.9, 1)
-light_energy = 0.82
-omni_range = 2.5
-omni_attenuation = 1.8
+light_energy = 1.35
+omni_range = 3.6
+omni_attenuation = 1.5

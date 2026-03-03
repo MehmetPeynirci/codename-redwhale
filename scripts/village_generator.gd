@@ -170,7 +170,6 @@ func _build_materials() -> void:
 	_metal_mat.albedo_color = Color(0.58, 0.58, 0.6, 1.0)
 	_metal_mat.roughness = 0.28
 	_metal_mat.metallic = 0.92
-	_metal_mat.specular = 0.72
 
 	_glass_shader_mat = ShaderMaterial.new()
 	_glass_shader_mat.shader = load("res://shaders/broken_glass.gdshader")
