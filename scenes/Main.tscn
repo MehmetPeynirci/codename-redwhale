@@ -1,4 +1,4 @@
-[gd_scene load_steps=14 format=3 uid="uid://bhf0s2f4r6m2q"]
+[gd_scene load_steps=15 format=3 uid="uid://bhf0s2f4r6m2q"]
 
 [ext_resource type="PackedScene" path="res://scenes/Player.tscn" id="1_player"]
 [ext_resource type="PackedScene" path="res://scenes/Village.tscn" id="2_village"]
@@ -10,6 +10,7 @@
 [ext_resource type="Script" path="res://scripts/minimap_ui.gd" id="8_minimap"]
 [ext_resource type="Script" path="res://scripts/horror_director.gd" id="9_horror"]
 [ext_resource type="Script" path="res://scripts/cinematic_postfx.gd" id="10_postfx"]
+[ext_resource type="Script" path="res://scripts/startup_intro.gd" id="11_intro"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_night_sky"]
 shader = ExtResource("7_night_sky")
@@ -34,6 +35,7 @@ adjustment_contrast = 1.06
 
 [node name="Main" type="Node3D"]
 script = ExtResource("5_quality")
+fast_start_quality = false
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="."]
 environment = SubResource("Environment_j35wl")
@@ -83,3 +85,6 @@ vignette_strength = 0.28
 chromatic_aberration = 0.0008
 contrast = 1.05
 saturation = 1.04
+
+[node name="StartupIntro" type="Node" parent="."]
+script = ExtResource("11_intro")

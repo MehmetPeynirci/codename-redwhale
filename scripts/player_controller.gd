@@ -48,6 +48,8 @@ const NIGHT_VISION_PROMPT_TEXT: String = "Gece gorusu acmak icin F'ye basin"
 @export var landing_bump_strength: float = 0.08
 @export var landing_recover_speed: float = 10.0
 @export var camera_roll_sway_enabled: bool = true
+@export var camera_noise_strength: float = 0.0016
+@export var camera_noise_speed: float = 1.15
 
 @export var injury_default_duration: float = 15.0
 @export var injury_speed_multiplier: float = 0.72
@@ -78,6 +80,7 @@ var _capsule: CapsuleShape3D
 var _is_crouching: bool = false
 var _landing_offset: float = 0.0
 var _mouse_sway: Vector2 = Vector2.ZERO
+var _camera_noise_time: float = 0.0
 
 var _controls_locked: bool = false
 var _injury_time_left: float = 0.0
@@ -516,6 +519,7 @@ func _apply_headbob(delta: float) -> void:
 func _update_camera_effects(delta: float, input_dir: Vector2) -> void:
 	_landing_offset = lerpf(_landing_offset, 0.0, minf(1.0, landing_recover_speed * delta))
 	_mouse_sway = _mouse_sway.lerp(Vector2.ZERO, minf(1.0, 8.0 * delta))
+	_camera_noise_time += delta * camera_noise_speed
 
 	var target_fov: float = walk_fov
 	if _is_crouching:
@@ -524,9 +528,15 @@ func _update_camera_effects(delta: float, input_dir: Vector2) -> void:
 		target_fov = sprint_fov
 	camera.fov = lerpf(camera.fov, target_fov, minf(1.0, fov_lerp_speed * delta))
 
+	var camera_noise: Vector3 = Vector3(
+		sin(_camera_noise_time * 1.3) * camera_noise_strength,
+		cos(_camera_noise_time * 1.7) * camera_noise_strength * 1.1,
+		0.0
+	)
+
 	if not camera_roll_sway_enabled:
 		camera.rotation = Vector3.ZERO
-		camera.position = _camera_base_pos
+		camera.position = _camera_base_pos + camera_noise
 		return
 
 	var limp_roll: float = sin(_injury_wobble_time * 7.0) * 0.035 if _is_injured_phase() else 0.0
@@ -534,7 +544,7 @@ func _update_camera_effects(delta: float, input_dir: Vector2) -> void:
 	camera.rotation.z = lerpf(camera.rotation.z, target_roll, minf(1.0, 10.0 * delta))
 
 	var sway_offset: Vector3 = Vector3(_mouse_sway.x * 0.35, -_mouse_sway.y * 0.35, 0.0)
-	camera.position = camera.position.lerp(_camera_base_pos + sway_offset, minf(1.0, 10.0 * delta))
+	camera.position = camera.position.lerp(_camera_base_pos + sway_offset + camera_noise, minf(1.0, 10.0 * delta))
 
 func _setup_default_input_map() -> void:
 	_add_action_if_missing(ACTION_MOVE_FORWARD, KEY_W)

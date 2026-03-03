@@ -25,7 +25,7 @@ const PBR_ASPHALT_PREFIX: String = "res://assets/pbr/asphalt021/Asphalt021_2K-JP
 @export var grave_count: int = 22
 @export var village_radius: float = 90.0
 @export var tree_count: int = 132
-@export var grass_count: int = 3400
+@export var grass_count: int = 4300
 @export var rock_count: int = 180
 @export var cemetery_center: Vector3 = Vector3(-30.0, 0.0, 10.0)
 @export var cemetery_half_extents: Vector2 = Vector2(4.0, 6.5)
@@ -578,9 +578,7 @@ func _create_foliage() -> void:
 
 	var blade_mesh: Mesh = _load_grass_mesh_asset()
 	if blade_mesh == null:
-		var fallback: QuadMesh = QuadMesh.new()
-		fallback.size = Vector2(0.24, 0.95)
-		blade_mesh = fallback
+		blade_mesh = _build_procedural_grass_mesh()
 
 	var mm: MultiMesh = MultiMesh.new()
 	mm.transform_format = MultiMesh.TRANSFORM_3D
@@ -597,10 +595,15 @@ func _create_foliage() -> void:
 			continue
 		if _is_near_house(Vector2(p.x, p.z), 4.1):
 			continue
+		var density_mask: float = _terrain_noise_secondary.get_noise_2d(p.x * 0.9, p.z * 0.9)
+		if density_mask < -0.18:
+			continue
 
 		var h: float = randf_range(0.65, 1.35)
 		var yaw: float = randf_range(-PI, PI)
-		var basis: Basis = Basis(Vector3.UP, yaw).scaled(Vector3(randf_range(0.8, 1.15), h, 1.0))
+		var tilt_x: float = randf_range(-0.1, 0.1)
+		var tilt_z: float = randf_range(-0.1, 0.1)
+		var basis: Basis = Basis.from_euler(Vector3(tilt_x, yaw, tilt_z)).scaled(Vector3(randf_range(0.75, 1.2), h, randf_range(0.85, 1.15)))
 		var base_y: float = _sample_terrain_height(p.x, p.z)
 		var xf: Transform3D = Transform3D(basis, Vector3(p.x, base_y + h * 0.5, p.z))
 		mm.set_instance_transform(placed, xf)
@@ -613,6 +616,68 @@ func _create_foliage() -> void:
 	mm_instance.multimesh = mm
 	mm_instance.material_override = _foliage_mat
 	grass_root.add_child(mm_instance)
+
+func _build_procedural_grass_mesh() -> Mesh:
+	var mesh: ArrayMesh = ArrayMesh.new()
+	var st: SurfaceTool = SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+
+	var width: float = 0.2
+	var height: float = 1.0
+	var planes: int = 3
+	for i in range(planes):
+		var yaw: float = float(i) * PI / float(planes)
+		var right: Vector3 = Vector3(cos(yaw), 0.0, sin(yaw)) * width * 0.5
+		var bottom_l: Vector3 = -right
+		var bottom_r: Vector3 = right
+		var top_l: Vector3 = Vector3(-right.x * 0.18, height, -right.z * 0.18)
+		var top_r: Vector3 = Vector3(right.x * 0.18, height, right.z * 0.18)
+		var normal: Vector3 = Vector3(-sin(yaw), 0.0, cos(yaw))
+
+		st.set_normal(normal)
+		st.set_uv(Vector2(0.0, 1.0))
+		st.add_vertex(bottom_l)
+		st.set_normal(normal)
+		st.set_uv(Vector2(1.0, 1.0))
+		st.add_vertex(bottom_r)
+		st.set_normal(normal)
+		st.set_uv(Vector2(0.0, 0.0))
+		st.add_vertex(top_l)
+
+		st.set_normal(normal)
+		st.set_uv(Vector2(0.0, 0.0))
+		st.add_vertex(top_l)
+		st.set_normal(normal)
+		st.set_uv(Vector2(1.0, 1.0))
+		st.add_vertex(bottom_r)
+		st.set_normal(normal)
+		st.set_uv(Vector2(1.0, 0.0))
+		st.add_vertex(top_r)
+
+		st.set_normal(-normal)
+		st.set_uv(Vector2(1.0, 1.0))
+		st.add_vertex(bottom_r)
+		st.set_normal(-normal)
+		st.set_uv(Vector2(0.0, 1.0))
+		st.add_vertex(bottom_l)
+		st.set_normal(-normal)
+		st.set_uv(Vector2(1.0, 0.0))
+		st.add_vertex(top_r)
+
+		st.set_normal(-normal)
+		st.set_uv(Vector2(1.0, 0.0))
+		st.add_vertex(top_r)
+		st.set_normal(-normal)
+		st.set_uv(Vector2(0.0, 1.0))
+		st.add_vertex(bottom_l)
+		st.set_normal(-normal)
+		st.set_uv(Vector2(0.0, 0.0))
+		st.add_vertex(top_l)
+
+	st.generate_normals()
+	st.generate_tangents()
+	st.commit(mesh)
+	return mesh
 
 func _create_rocks() -> void:
 	var rock_root: Node3D = Node3D.new()
