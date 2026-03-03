@@ -15,16 +15,22 @@ const HOUSE_DOOR_HANDLE_BASE_RADIUS: float = 0.022
 const HOUSE_DOOR_HANDLE_BASE_HEIGHT: float = 0.05
 const HOUSE_DOOR_HANDLE_BAR_SIZE: Vector3 = Vector3(0.22, 0.028, 0.028)
 const HOUSE_DOOR_HANDLE_BAR_POSITION: Vector3 = Vector3(0.11, 0.0, 0.01)
+const PBR_WALL_PREFIX: String = "res://assets/pbr/paintedplaster012/PaintedPlaster012_2K-JPG"
+const PBR_ROOF_PREFIX: String = "res://assets/pbr/roofingtiles014b/RoofingTiles014B_2K-JPG"
+const PBR_WOOD_PREFIX: String = "res://assets/pbr/wood039/Wood039_2K-JPG"
+const PBR_CONCRETE_PREFIX: String = "res://assets/pbr/concrete012/Concrete012_2K-JPG"
+const PBR_GROUND_PREFIX: String = "res://assets/pbr/ground091/Ground091_2K-JPG"
+const PBR_ASPHALT_PREFIX: String = "res://assets/pbr/asphalt021/Asphalt021_2K-JPG"
 
-@export var grave_count: int = 14
+@export var grave_count: int = 22
 @export var village_radius: float = 90.0
-@export var tree_count: int = 84
-@export var grass_count: int = 2000
-@export var rock_count: int = 118
+@export var tree_count: int = 132
+@export var grass_count: int = 3400
+@export var rock_count: int = 180
 @export var cemetery_center: Vector3 = Vector3(-30.0, 0.0, 10.0)
 @export var cemetery_half_extents: Vector2 = Vector2(4.0, 6.5)
 
-@export var terrain_resolution: int = 88
+@export var terrain_resolution: int = 112
 @export var terrain_height: float = 2.8
 @export var terrain_base_frequency: float = 0.019
 @export var terrain_detail_frequency: float = 0.062
@@ -34,7 +40,7 @@ const HOUSE_DOOR_HANDLE_BAR_POSITION: Vector3 = Vector3(0.11, 0.0, 0.01)
 @export var road_width: float = 5.4
 @export var road_shoulder_width: float = 2.6
 @export var road_height_offset: float = 0.035
-@export var road_samples_per_segment: int = 14
+@export var road_samples_per_segment: int = 18
 @export var road_path_points: PackedVector3Array = PackedVector3Array([
 	Vector3(7.5, 0.0, 37.0),
 	Vector3(4.6, 0.0, 19.0),
@@ -50,14 +56,14 @@ const HOUSE_DOOR_HANDLE_BAR_POSITION: Vector3 = Vector3(0.11, 0.0, 0.01)
 	"res://assets/foliage/grass_01.glb"
 ])
 
-var _wall_mat: ShaderMaterial
-var _roof_mat: ShaderMaterial
-var _wood_mat: ShaderMaterial
-var _door_mat: ShaderMaterial
-var _grave_mat: ShaderMaterial
-var _ground_shader_mat: ShaderMaterial
-var _asphalt_mat: ShaderMaterial
-var _glass_shader_mat: ShaderMaterial
+var _wall_mat: Material
+var _roof_mat: Material
+var _wood_mat: Material
+var _door_mat: Material
+var _grave_mat: Material
+var _ground_shader_mat: Material
+var _asphalt_mat: Material
+var _glass_shader_mat: Material
 var _foliage_mat: ShaderMaterial
 var _door_script: Script
 
@@ -104,73 +110,21 @@ func _configure_terrain_noise() -> void:
 	_terrain_noise_secondary.noise_type = FastNoiseLite.TYPE_SIMPLEX
 
 func _build_materials() -> void:
-	var weather_shader: Shader = load("res://shaders/weathered_surface.gdshader")
+	_wall_mat = _create_pbr_material(PBR_WALL_PREFIX, Vector3(0.95, 0.95, 0.95), true)
+	_roof_mat = _create_pbr_material(PBR_ROOF_PREFIX, Vector3(0.82, 0.82, 0.82), true)
+	_wood_mat = _create_pbr_material(PBR_WOOD_PREFIX, Vector3(1.35, 1.35, 1.35), true)
+	_door_mat = _create_pbr_material(PBR_WOOD_PREFIX, Vector3(1.05, 1.05, 1.05), true)
+	_grave_mat = _create_pbr_material(PBR_CONCRETE_PREFIX, Vector3(1.15, 1.15, 1.15), true)
+	_ground_shader_mat = _create_pbr_material(PBR_GROUND_PREFIX, Vector3(10.0, 1.0, 10.0), false)
+	_asphalt_mat = _create_pbr_material(PBR_ASPHALT_PREFIX, Vector3(4.0, 1.0, 4.0), false)
 
-	_wall_mat = _create_weathered_mat(
-		weather_shader,
-		Color(0.23, 0.23, 0.22),
-		Color(0.13, 0.19, 0.15),
-		Color(0.08, 0.09, 0.10),
-		0.62,
-		8.5,
-		0.42,
-		0.9,
-		0.26
-	)
-
-	_roof_mat = _create_weathered_mat(
-		weather_shader,
-		Color(0.10, 0.10, 0.11),
-		Color(0.09, 0.13, 0.10),
-		Color(0.05, 0.06, 0.07),
-		0.75,
-		11.0,
-		0.22,
-		0.84,
-		0.18
-	)
-
-	_wood_mat = _create_weathered_mat(
-		weather_shader,
-		Color(0.18, 0.13, 0.09),
-		Color(0.14, 0.17, 0.12),
-		Color(0.07, 0.07, 0.06),
-		0.55,
-		12.0,
-		0.26,
-		0.78,
-		0.33
-	)
-
-	_door_mat = _create_weathered_mat(
-		weather_shader,
-		Color(0.12, 0.09, 0.07),
-		Color(0.13, 0.16, 0.12),
-		Color(0.06, 0.06, 0.05),
-		0.46,
-		18.0,
-		0.22,
-		0.74,
-		0.34
-	)
-
-	_grave_mat = _create_weathered_mat(
-		weather_shader,
-		Color(0.37, 0.37, 0.38),
-		Color(0.19, 0.24, 0.20),
-		Color(0.12, 0.12, 0.12),
-		0.52,
-		9.0,
-		0.47,
-		0.93,
-		0.35
-	)
-
-	_ground_shader_mat = ShaderMaterial.new()
-	_ground_shader_mat.shader = load("res://shaders/wet_ground.gdshader")
-
-	_asphalt_mat = ShaderMaterial.new()
-	_asphalt_mat.shader = load("res://shaders/asphalt_road.gdshader")
+	var door_standard: StandardMaterial3D = _door_mat as StandardMaterial3D
+	if door_standard != null:
+		door_standard.albedo_color = Color(0.78, 0.75, 0.73)
+		door_standard.roughness = 0.9
+	var roof_standard: StandardMaterial3D = _roof_mat as StandardMaterial3D
+	if roof_standard != null:
+		roof_standard.roughness = 0.95
 
 	_glass_shader_mat = ShaderMaterial.new()
 	_glass_shader_mat.shader = load("res://shaders/broken_glass.gdshader")
@@ -196,28 +150,41 @@ func _build_materials() -> void:
 
 	_door_script = load("res://scripts/interactable_door.gd") as Script
 
-func _create_weathered_mat(
-	shader: Shader,
-	base_color: Color,
-	moss_color: Color,
-	wet_dark_color: Color,
-	wetness: float,
-	grunge_scale: float,
-	moss_amount: float,
-	rough_dry: float,
-	rough_wet: float
-) -> ShaderMaterial:
-	var mat: ShaderMaterial = ShaderMaterial.new()
-	mat.shader = shader
-	mat.set_shader_parameter("base_color", base_color)
-	mat.set_shader_parameter("moss_color", moss_color)
-	mat.set_shader_parameter("wet_dark_color", wet_dark_color)
-	mat.set_shader_parameter("wetness", wetness)
-	mat.set_shader_parameter("grunge_scale", grunge_scale)
-	mat.set_shader_parameter("moss_amount", moss_amount)
-	mat.set_shader_parameter("roughness_dry", rough_dry)
-	mat.set_shader_parameter("roughness_wet", rough_wet)
+func _create_pbr_material(prefix: String, uv_scale: Vector3, use_triplanar: bool) -> StandardMaterial3D:
+	var mat: StandardMaterial3D = StandardMaterial3D.new()
+	mat.uv1_scale = uv_scale
+	mat.uv1_triplanar = use_triplanar
+	mat.uv1_world_triplanar = use_triplanar
+	mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+	mat.metallic = 0.0
+	mat.roughness = 1.0
+
+	var albedo_tex: Texture2D = _load_texture_if_exists("%s_Color.jpg" % prefix)
+	if albedo_tex != null:
+		mat.albedo_texture = albedo_tex
+
+	var normal_tex: Texture2D = _load_texture_if_exists("%s_NormalGL.jpg" % prefix)
+	if normal_tex != null:
+		mat.normal_enabled = true
+		mat.normal_texture = normal_tex
+		mat.normal_scale = 1.0
+
+	var roughness_tex: Texture2D = _load_texture_if_exists("%s_Roughness.jpg" % prefix)
+	if roughness_tex != null:
+		mat.roughness_texture = roughness_tex
+
+	var ao_tex: Texture2D = _load_texture_if_exists("%s_AmbientOcclusion.jpg" % prefix)
+	if ao_tex != null:
+		mat.ao_enabled = true
+		mat.ao_texture = ao_tex
+		mat.ao_light_affect = 0.4
+
 	return mat
+
+func _load_texture_if_exists(path: String) -> Texture2D:
+	if not ResourceLoader.exists(path):
+		return null
+	return load(path) as Texture2D
 
 func _create_ground() -> void:
 	var ground_mesh: MeshInstance3D = MeshInstance3D.new()

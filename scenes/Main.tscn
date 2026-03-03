@@ -1,4 +1,4 @@
-[gd_scene load_steps=13 format=3 uid="uid://bhf0s2f4r6m2q"]
+[gd_scene load_steps=14 format=3 uid="uid://bhf0s2f4r6m2q"]
 
 [ext_resource type="PackedScene" path="res://scenes/Player.tscn" id="1_player"]
 [ext_resource type="PackedScene" path="res://scenes/Village.tscn" id="2_village"]
@@ -6,9 +6,10 @@
 [ext_resource type="Script" path="res://scripts/crash_sequence.gd" id="4_crash"]
 [ext_resource type="Script" path="res://scripts/visual_quality_controller.gd" id="5_quality"]
 [ext_resource type="PackedScene" path="res://scenes/FuelCan.tscn" id="6_fuel"]
-[ext_resource type="Shader" path="res://shaders/night_sky.gdshader" id="7_night_sky"]
+[ext_resource type="Shader" path="res://shaders/dusk_sky.gdshader" id="7_night_sky"]
 [ext_resource type="Script" path="res://scripts/minimap_ui.gd" id="8_minimap"]
 [ext_resource type="Script" path="res://scripts/horror_director.gd" id="9_horror"]
+[ext_resource type="Script" path="res://scripts/cinematic_postfx.gd" id="10_postfx"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_night_sky"]
 shader = ExtResource("7_night_sky")
@@ -20,16 +21,16 @@ sky_material = SubResource("ShaderMaterial_night_sky")
 background_mode = 2
 sky = SubResource("Sky_4hgrx")
 ambient_light_source = 3
-ambient_light_color = Color(0.2, 0.25, 0.34, 1)
-ambient_light_energy = 0.35
+ambient_light_color = Color(0.58, 0.52, 0.46, 1)
+ambient_light_energy = 0.82
 fog_enabled = true
-fog_light_energy = 0.32
-fog_density = 0.012
+fog_light_energy = 0.74
+fog_density = 0.0045
 volumetric_fog_enabled = true
-volumetric_fog_density = 0.018
+volumetric_fog_density = 0.006
 adjustment_enabled = true
-adjustment_brightness = 0.86
-adjustment_contrast = 1.03
+adjustment_brightness = 1.02
+adjustment_contrast = 1.06
 
 [node name="Main" type="Node3D"]
 script = ExtResource("5_quality")
@@ -70,7 +71,15 @@ village_path = NodePath("../Village")
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
 transform = Transform3D(0.965926, -0.258819, 0, 0.183013, 0.683013, -0.707107, 0.183013, 0.683013, 0.707107, 0, 9, 0)
-light_energy = 0.26
-light_color = Color(0.54, 0.59, 0.76, 1)
+light_energy = 1.08
+light_color = Color(1, 0.78, 0.62, 1)
 shadow_enabled = true
 shadow_blur = 1.6
+
+[node name="CinematicPostFX" type="Node" parent="."]
+script = ExtResource("10_postfx")
+grain_strength = 0.022
+vignette_strength = 0.28
+chromatic_aberration = 0.0008
+contrast = 1.05
+saturation = 1.04
