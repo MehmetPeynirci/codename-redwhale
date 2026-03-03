@@ -386,7 +386,7 @@ func _set_area_visible(area: Area3D, value: bool) -> void:
 
 func _build_objective_ui() -> void:
 	_objective_layer = CanvasLayer.new()
-	_objective_layer.layer = 46
+	_objective_layer.layer = 72
 	add_child(_objective_layer)
 
 	_objective_bg = ColorRect.new()
@@ -400,7 +400,7 @@ func _build_objective_ui() -> void:
 	_objective_label.position = Vector2(14.0, 12.0)
 	_objective_label.size = Vector2(620.0, 30.0)
 	_objective_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_objective_label.add_theme_color_override("font_color", Color(0.93, 0.94, 0.95, 1.0))
+	_objective_label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 1.0))
 	_objective_label.add_theme_font_size_override("font_size", 20)
 	_objective_bg.add_child(_objective_label)
 
@@ -408,7 +408,7 @@ func _build_objective_ui() -> void:
 	_detail_label.position = Vector2(14.0, 46.0)
 	_detail_label.size = Vector2(620.0, 36.0)
 	_detail_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_detail_label.add_theme_color_override("font_color", Color(0.78, 0.82, 0.86, 0.92))
+	_detail_label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 1.0))
 	_detail_label.add_theme_font_size_override("font_size", 16)
 	_objective_bg.add_child(_detail_label)
 
@@ -433,7 +433,7 @@ func _build_objective_ui() -> void:
 	_hint_label.anchor_bottom = 1.0
 	_hint_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_hint_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_hint_label.add_theme_color_override("font_color", Color(0.91, 0.93, 0.95, 1.0))
+	_hint_label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 1.0))
 	_hint_label.add_theme_font_size_override("font_size", 16)
 	_hint_bg.add_child(_hint_label)
 

@@ -165,7 +165,6 @@ func _unhandled_input(event: InputEvent) -> void:
 			_show_night_vision_prompt(NIGHT_VISION_LOCKED_HINT_DURATION)
 			return
 		_set_night_vision_enabled(not _night_vision_on)
-		_night_vision_prompt_time_left = 0.0
 		return
 
 	if _controls_locked:
@@ -674,7 +673,7 @@ func _update_door_prompt() -> void:
 func _update_night_vision_prompt() -> void:
 	if _night_vision_prompt_bg == null or _night_vision_prompt_label == null:
 		return
-	var should_show: bool = _night_vision_unlocked and not _night_vision_on and _night_vision_prompt_time_left > 0.0
+	var should_show: bool = _night_vision_unlocked and _night_vision_prompt_time_left > 0.0
 	_night_vision_prompt_bg.visible = should_show
 	if should_show:
 		_night_vision_prompt_label.text = NIGHT_VISION_PROMPT_TEXT

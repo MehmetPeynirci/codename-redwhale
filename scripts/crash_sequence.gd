@@ -387,7 +387,7 @@ func _update_cinematic_camera(delta: float, shake_amount: float) -> void:
 
 func _create_objective_ui() -> void:
 	_ui_layer = CanvasLayer.new()
-	_ui_layer.layer = 40
+	_ui_layer.layer = 71
 	add_child(_ui_layer)
 
 	_objective_bg = ColorRect.new()
@@ -401,7 +401,7 @@ func _create_objective_ui() -> void:
 	_objective_label.position = Vector2(16.0, 16.0)
 	_objective_label.size = Vector2(586.0, 38.0)
 	_objective_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_objective_label.add_theme_color_override("font_color", Color(0.93, 0.94, 0.95, 1.0))
+	_objective_label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 1.0))
 	_objective_label.add_theme_font_size_override("font_size", 18)
 	_objective_bg.add_child(_objective_label)
 
