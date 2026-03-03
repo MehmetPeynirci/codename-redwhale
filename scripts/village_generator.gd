@@ -22,7 +22,7 @@ const PBR_CONCRETE_PREFIX: String = "res://assets/pbr/concrete012/Concrete012_2K
 const PBR_GROUND_PREFIX: String = "res://assets/pbr/ground091/Ground091_2K-JPG"
 const PBR_ASPHALT_PREFIX: String = "res://assets/pbr/asphalt021/Asphalt021_2K-JPG"
 
-@export var grave_count: int = 22
+@export var grave_count: int = 0
 @export var village_radius: float = 90.0
 @export var tree_count: int = 132
 @export var grass_count: int = 4300
@@ -466,6 +466,9 @@ func _create_house_door_handle() -> Node3D:
 	return handle_pivot
 
 func _create_graves() -> void:
+	if grave_count <= 0:
+		return
+
 	var grave_root: Node3D = Node3D.new()
 	grave_root.name = "Graves"
 	grave_root.position = Vector3(cemetery_center.x, _sample_terrain_height(cemetery_center.x, cemetery_center.z), cemetery_center.z)

@@ -6,7 +6,7 @@
 [ext_resource type="Script" path="res://scripts/crash_sequence.gd" id="4_crash"]
 [ext_resource type="Script" path="res://scripts/visual_quality_controller.gd" id="5_quality"]
 [ext_resource type="PackedScene" path="res://scenes/FuelCan.tscn" id="6_fuel"]
-[ext_resource type="Shader" path="res://shaders/dusk_sky.gdshader" id="7_night_sky"]
+[ext_resource type="Shader" path="res://shaders/night_sky.gdshader" id="7_night_sky"]
 [ext_resource type="Script" path="res://scripts/minimap_ui.gd" id="8_minimap"]
 [ext_resource type="Script" path="res://scripts/horror_director.gd" id="9_horror"]
 [ext_resource type="Script" path="res://scripts/cinematic_postfx.gd" id="10_postfx"]
@@ -22,16 +22,16 @@ sky_material = SubResource("ShaderMaterial_night_sky")
 background_mode = 2
 sky = SubResource("Sky_4hgrx")
 ambient_light_source = 3
-ambient_light_color = Color(0.58, 0.52, 0.46, 1)
-ambient_light_energy = 0.82
+ambient_light_color = Color(0.13, 0.17, 0.26, 1)
+ambient_light_energy = 0.22
 fog_enabled = true
-fog_light_energy = 0.74
-fog_density = 0.0045
+fog_light_energy = 0.2
+fog_density = 0.0105
 volumetric_fog_enabled = true
-volumetric_fog_density = 0.006
+volumetric_fog_density = 0.013
 adjustment_enabled = true
-adjustment_brightness = 1.02
-adjustment_contrast = 1.06
+adjustment_brightness = 0.73
+adjustment_contrast = 1.08
 
 [node name="Main" type="Node3D"]
 script = ExtResource("5_quality")
@@ -73,8 +73,8 @@ village_path = NodePath("../Village")
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
 transform = Transform3D(0.965926, -0.258819, 0, 0.183013, 0.683013, -0.707107, 0.183013, 0.683013, 0.707107, 0, 9, 0)
-light_energy = 1.08
-light_color = Color(1, 0.78, 0.62, 1)
+light_energy = 0.16
+light_color = Color(0.48, 0.56, 0.74, 1)
 shadow_enabled = true
 shadow_blur = 1.6
 
